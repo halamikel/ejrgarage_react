@@ -37,6 +37,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "7f7fb751-9ed1-4095-a4db-fd6dff7563c5"
+      }
+    },
+    "owner": "mikelns-team"
   }
 }
