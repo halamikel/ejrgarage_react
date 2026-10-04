@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import type { ColorValue } from 'react-native';
 import { useRoleGuard } from '@/lib/RoleGuard';
 import { cart } from '@/services/cart';
+import { CartButton } from '@/components/CartButton';
 import { colors, fonts } from '@/theme/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -28,10 +29,31 @@ export default function CustomerLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.grey,
         tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
+        tabBarStyle: {
+          borderTopWidth: 0,
+          elevation: 20,
+          shadowColor: '#000',
+          shadowOpacity: 0.08,
+          shadowRadius: 20,
+          shadowOffset: { width: 0, height: -5 },
+        },
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: icon('home', 'home-outline') }} />
-      <Tabs.Screen name="parts" options={{ title: 'Parts', tabBarIcon: icon('build', 'build-outline') }} />
+      <Tabs.Screen
+        name="parts"
+        options={{
+          title: 'Parts',
+          tabBarIcon: icon('build', 'build-outline'),
+          // Flutter's "Available Parts" AppBar with the cart badge.
+          headerShown: true,
+          headerTitle: 'Available Parts',
+          headerTitleAlign: 'center',
+          headerShadowVisible: false,
+          headerTitleStyle: { fontFamily: fonts.semibold, fontSize: 18 },
+          headerRight: () => <CartButton />,
+        }}
+      />
       <Tabs.Screen name="booking" options={{ title: 'Booking', tabBarIcon: icon('book', 'book-outline') }} />
       <Tabs.Screen name="chat" options={{ title: 'Chat', tabBarIcon: icon('chatbubble', 'chatbubble-outline') }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: icon('person', 'person-outline') }} />

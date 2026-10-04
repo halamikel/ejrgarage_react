@@ -1,50 +1,79 @@
 {
   "expo": {
-    "name": "ejrgarage",
-    "slug": "ejrgarage",
-    "version": "1.0.0",
+    "name": "EJR Mobile",
+    "slug": "ejr-mobile",
+    "version": "1.1.6",
+    "scheme": "ejrmobile",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "ejrgarage",
-    "userInterfaceStyle": "automatic",
+    "icon": "./assets/images/ejr_icon_ios.png",
+    "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "bundleIdentifier": "com.ejrgarage.ejrMobile",
+      "supportsTablet": false,
+      "associatedDomains": [
+        "applinks:ejrgarage-staging.onrender.com"
+      ]
     },
     "android": {
+      "package": "com.ejrgarage.ejr_mobile",
+      "allowBackup": false,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/ejr_icon_foreground.png"
       },
-      "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "permissions": [
+        "CAMERA",
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ],
+      "blockedPermissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "ejrgarage-staging.onrender.com",
+              "pathPrefix": "/reset-password.php"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "plugins": [
       "expo-router",
+      "expo-secure-store",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "image": "./assets/images/ejr_logo_splash.png",
+          "imageWidth": 180,
+          "backgroundColor": "#FDE8DC"
         }
       ],
-      "expo-secure-store"
-    ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    },
-    "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "7f7fb751-9ed1-4095-a4db-fd6dff7563c5"
-      }
-    },
-    "owner": "mikelns-team"
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "EJR Mobile uses the camera so you can take a profile photo.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#ED5B1C"
+        }
+      ]
+    ]
   }
 }

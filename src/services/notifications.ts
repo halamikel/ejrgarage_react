@@ -16,6 +16,10 @@ let lastSeenJobId = 0;
 let isFirstCheck = true;
 
 export async function initNotifications() {
+  // Local notifications aren't supported in the browser, and requesting
+  // permission there just pops a browser prompt.
+  if (Platform.OS === 'web') return;
+
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
@@ -76,6 +80,7 @@ async function checkNewJobs() {
 }
 
 export function startPolling() {
+  if (Platform.OS === 'web') return;
   stopPolling();
   isFirstCheck = true;
   pollTimer = setInterval(checkNewJobs, 30_000);

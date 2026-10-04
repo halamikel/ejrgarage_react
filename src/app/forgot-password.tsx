@@ -1,8 +1,9 @@
 // Port of lib/screens/forgot_password_screen.dart.
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { BackButton, ErrorBanner, Field, PrimaryButton, Screen } from '@/components/ui';
+import { showAlert } from '@/lib/dialogs';
 import { ApiException, api } from '@/services/api';
 import { text } from '@/theme/theme';
 
@@ -17,12 +18,11 @@ export default function ForgotPasswordScreen() {
     setError(null);
     try {
       await api.forgotPassword(email.trim());
-      Alert.alert(
+      await showAlert(
         'Check your email',
         'If an account with that email exists, a password reset link has been sent. Open it from your email app to set a new password, then come back and log in.',
-        [{ text: 'OK', onPress: () => router.back() }],
-        { cancelable: false },
       );
+      router.back();
     } catch (e) {
       setError(
         e instanceof ApiException ? e.message : 'Something went wrong. Please check your connection and try again.',

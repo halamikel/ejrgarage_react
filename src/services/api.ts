@@ -4,7 +4,7 @@
 // is kept in secure storage and attached as a Bearer token to every
 // authenticated request.
 
-import * as SecureStore from 'expo-secure-store';
+import { secureStorage } from './secureStorage';
 
 // Responses are loosely-typed JSON from the PHP backend (the Dart code used
 // Map<String, dynamic> everywhere). Tighten these per-screen as you port them.
@@ -116,13 +116,13 @@ class ApiService {
 
   // ── Token storage ───────────────────────────────────────────
   private saveToken(token: string) {
-    return SecureStore.setItemAsync(TOKEN_KEY, token);
+    return secureStorage.setItem(TOKEN_KEY, token);
   }
   getToken() {
-    return SecureStore.getItemAsync(TOKEN_KEY);
+    return secureStorage.getItem(TOKEN_KEY);
   }
   clearToken() {
-    return SecureStore.deleteItemAsync(TOKEN_KEY);
+    return secureStorage.deleteItem(TOKEN_KEY);
   }
   async isLoggedIn() {
     return (await this.getToken()) != null;
@@ -331,14 +331,15 @@ class ApiService {
       throw new ApiException(res.message ?? 'Could not submit inquiry.');
     }
   }
-  /** items: [{ id, name, price, qty }]. Returns { checkout_url } for 'card', null for 'cod'. */
+  /** items: [{ id, name, price, qty }]. Returns { checkout_url } for online payments, null for 'cod'. */
   placeOrder(a: {
     customerName: string;
     contact: string;
     address: string;
     items: Json[];
     totalPrice: number;
-    paymentMethod: 'card' | 'cod';
+    /** The Flutter cart sends 'online' | 'cod' (online => PayMongo checkout_url). */
+    paymentMethod: 'online' | 'card' | 'cod';
   }) {
     return this.post('place_order.php', {
       customer_name: a.customerName,

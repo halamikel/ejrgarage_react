@@ -1,8 +1,9 @@
 // Port of lib/screens/signup_screen.dart.
 import { Link, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { BackButton, CheckRow, ErrorBanner, Field, PrimaryButton, Screen } from '@/components/ui';
+import { showAlert } from '@/lib/dialogs';
 import { ApiException, api } from '@/services/api';
 import { text } from '@/theme/theme';
 
@@ -22,7 +23,7 @@ export default function SignUpScreen() {
     try {
       await api.register({ name: name.trim(), email: email.trim(), phone: phone.trim(), password });
       // register.php doesn't log in; the user must click the emailed link first.
-      Alert.alert('Account created!', 'Check your email to verify before logging in.');
+      await showAlert('Account created!', 'Check your email to verify before logging in.');
       router.replace('/login');
     } catch (e) {
       setError(
