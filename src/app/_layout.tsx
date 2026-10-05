@@ -5,13 +5,15 @@ import {
   Poppins_700Bold,
   useFonts,
 } from '@expo-google-fonts/poppins';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { initNotifications } from '@/services/notifications';
+import { onUnauthorized } from '@/services/api';
+import { initNotifications, stopPolling } from '@/services/notifications';
+import { userSession } from '@/services/session';
 import { ToastProvider } from '@/components/Toast';
 import { colors, fonts } from '@/theme/theme';
 
@@ -44,6 +46,20 @@ export default function RootLayout() {
   useEffect(() => {
     initNotifications();
   }, []);
+
+  // Token expired mid-session -> back to the welcome screen. Ignored when no
+  // user is loaded (e.g. the splash's profile check) so it can't skip the
+  // splash's update-required / security prompts.
+  useEffect(
+    () =>
+      onUnauthorized(() => {
+        if (!userSession.user) return;
+        stopPolling();
+        userSession.clear();
+        router.replace('/get-started');
+      }),
+    [],
+  );
 
   if (!fontsLoaded && !fontError) return null;
 

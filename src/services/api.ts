@@ -34,6 +34,18 @@ export type UploadFile = { uri: string; name?: string | null; type?: string | nu
 
 const TOKEN_KEY = 'jwt_token';
 
+// The backend issues 24h JWTs. When an authenticated call comes back 401 the
+// token is dead, so clear it and let the app (see app/_layout.tsx) send the
+// user back to the welcome screen instead of leaving every screen erroring.
+type UnauthorizedListener = () => void;
+const unauthorizedListeners = new Set<UnauthorizedListener>();
+export function onUnauthorized(listener: UnauthorizedListener) {
+  unauthorizedListeners.add(listener);
+  return () => {
+    unauthorizedListeners.delete(listener);
+  };
+}
+
 // These headers mimic a modern Android browser. This is essential for
 // bypassing security challenges (like TestCookie/AES) that some free hosts
 // use to block mobile apps. (Same headers the Flutter app sent.)
@@ -109,6 +121,35 @@ async function readJson(res: Response): Promise<Json> {
   return decode(res, await res.text());
 }
 
+/**
+ * fetch() with a timeout and readable errors.
+ *
+ * The backend is on Render, which puts idle services to sleep; the first
+ * request after that can take 30-60s, so the timeout is generous. Network
+ * failures (offline, DNS, server down, or on web builds a CORS block) all
+ * surface from fetch() as an opaque TypeError, so log the real cause and throw
+ * an ApiException the UI can show instead of a generic message.
+ */
+const REQUEST_TIMEOUT_MS = 60_000;
+
+async function netFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } catch (e) {
+    const timedOut = ctrl.signal.aborted;
+    console.warn(`[api] ${init.method ?? 'GET'} ${url} failed${timedOut ? ' (timed out)' : ''}:`, e);
+    throw new ApiException(
+      timedOut
+        ? 'The server is taking too long to respond. It may be waking up - please try again in a moment.'
+        : 'Cannot reach the server. Check your internet connection and try again. (On a web build this can also be a CORS block - see the browser console.)',
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 class ApiService {
   /** Override at build time with EXPO_PUBLIC_API_BASE_URL (must end with "/"). */
   static readonly baseUrl: string =
@@ -127,6 +168,10 @@ class ApiService {
   async isLoggedIn() {
     return (await this.getToken()) != null;
   }
+  private async expireSession() {
+    await this.clearToken();
+    unauthorizedListeners.forEach((l) => l());
+  }
 
   // ── Low-level helpers ───────────────────────────────────────
   private async authedFetch(endpoint: string, init: { method: 'GET' | 'POST'; body?: unknown }) {
@@ -136,7 +181,7 @@ class ApiService {
     const headers: Record<string, string> = { ...BASE_HEADERS, Authorization: `Bearer ${token}` };
     if (init.method === 'POST') headers['Content-Type'] = 'application/json';
 
-    const res = await fetch(`${ApiService.baseUrl}${endpoint}`, {
+    const res = await netFetch(`${ApiService.baseUrl}${endpoint}`, {
       method: init.method,
       headers,
       body: init.method === 'POST' ? JSON.stringify(init.body ?? {}) : undefined,
@@ -147,6 +192,7 @@ class ApiService {
   private async handleAuthedResponse(res: Response): Promise<Json> {
     const body = await readJson(res);
     if (res.status === 401) {
+      await this.expireSession();
       throw new ApiException(body.message ?? 'Session expired. Please log in again.', {
         statusCode: 401,
       });
@@ -159,7 +205,7 @@ class ApiService {
 
   /** Public POST (no token) used by login/register/forgot/reset. */
   private async publicPost(endpoint: string, data: unknown): Promise<{ res: Response; body: Json }> {
-    const res = await fetch(`${ApiService.baseUrl}${endpoint}`, {
+    const res = await netFetch(`${ApiService.baseUrl}${endpoint}`, {
       method: 'POST',
       headers: { ...BASE_HEADERS, 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -169,7 +215,7 @@ class ApiService {
 
   /** Public GET (no token) — e.g. get_services.php, get_parts.php. */
   async getPublic(endpoint: string): Promise<Json> {
-    const res = await fetch(`${ApiService.baseUrl}${endpoint}`, { headers: BASE_HEADERS });
+    const res = await netFetch(`${ApiService.baseUrl}${endpoint}`, { headers: BASE_HEADERS });
     const body = await readJson(res);
     if (body.status === 'error') {
       throw new ApiException(body.message ?? 'Request failed.', { statusCode: res.status });
@@ -197,7 +243,7 @@ class ApiService {
     // React Native's FormData accepts { uri, name, type } for file parts.
     form.append(field, { uri: file.uri, name, type: file.type || 'image/jpeg' } as any);
 
-    const res = await fetch(`${ApiService.baseUrl}${endpoint}`, {
+    const res = await netFetch(`${ApiService.baseUrl}${endpoint}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: form,
@@ -211,6 +257,7 @@ class ApiService {
         statusCode: res.status,
       });
     }
+    if (res.status === 401) await this.expireSession();
     if (data.status !== 'success') {
       throw new ApiException(data.message ?? 'Could not upload photo.', { statusCode: res.status });
     }
@@ -397,7 +444,7 @@ class ApiService {
     transmission: string;
     fuel: string;
   }) {
-    return this.post('update_vehicles.php', a);
+    return this.post('update_vehicle.php', a);
   }
   cancelAppointment(appointmentId: number) {
     return this.post('cancel_appointment.php', { id: appointmentId });
