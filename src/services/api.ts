@@ -5,6 +5,7 @@
 // authenticated request.
 
 import { secureStorage } from './secureStorage';
+import { Platform } from 'react-native';
 
 // Responses are loosely-typed JSON from the PHP backend (the Dart code used
 // Map<String, dynamic> everywhere). Tighten these per-screen as you port them.
@@ -240,8 +241,14 @@ class ApiService {
 
     const form = new FormData();
     const name = file.name || file.uri.split('/').pop() || `${field}.jpg`;
-    // React Native's FormData accepts { uri, name, type } for file parts.
-    form.append(field, { uri: file.uri, name, type: file.type || 'image/jpeg' } as any);
+    if (Platform.OS === 'web') {
+      // Browser FormData needs a real Blob; the { uri } shorthand is RN-only.
+      const blob = await (await fetch(file.uri)).blob();
+      form.append(field, blob, name);
+    } else {
+      // React Native's FormData accepts { uri, name, type } for file parts.
+      form.append(field, { uri: file.uri, name, type: file.type || 'image/jpeg' } as any);
+    }
 
     const res = await netFetch(`${ApiService.baseUrl}${endpoint}`, {
       method: 'POST',
@@ -540,13 +547,13 @@ class ApiService {
   addMechanic(a: { name: string; specialty: string }) {
     return this.post('admin/manage_mechanics.php', { action: 'add', ...a });
   }
-  updateMechanic(a: { id: number; name: string; specialty: string; isAvailable: boolean }) {
+  updateMechanic(a: { id: number; name: string; specialty: string; isAvailable?: boolean; status?: string }) {
     return this.post('admin/manage_mechanics.php', {
       action: 'update',
       id: a.id,
       name: a.name,
       specialty: a.specialty,
-      status: a.isAvailable ? 'available' : 'unavailable',
+      status: a.status ?? (a.isAvailable ? 'available' : 'unavailable'),
     });
   }
   deleteMechanic(id: number) {
@@ -733,12 +740,13 @@ class ApiService {
   /** action: 'update_status' | 'delete' | 'send_receipt' */
   manageOrder(a: { orderId: number; action: string; extra?: Json }) {
     switch (a.action) {
-      case 'update_status':
-        return this.post('admin/manage_orders.php', {
-          action: 'update_status',
-          id: a.orderId,
-          status: a.extra?.status,
-        });
+      case 'update_status': {
+        const body: Json = { action: 'update_status', id: a.orderId, status: a.extra?.status };
+        if (a.extra?.status === 'cancelled' && String(a.extra?.cancellation_reply ?? '').length > 0) {
+          body.cancellation_reply = a.extra?.cancellation_reply;
+        }
+        return this.post('admin/manage_orders.php', body);
+      }
       case 'delete':
         return this.post('admin/manage_orders.php', { action: 'delete', id: a.orderId });
       case 'send_receipt':
