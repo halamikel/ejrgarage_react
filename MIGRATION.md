@@ -50,7 +50,7 @@ Target: Expo SDK 57 · React Native 0.86 · TypeScript · Expo Router (file-base
 | `lib/screens/admin/admin_dashboard.dart` | 638 | 🟡 Shell | Route stub `(admin)/index.tsx` |
 | `lib/screens/admin/admin_drawer.dart` | 635 | 🟡 Shell | Drawer + menu done in `(admin)/_layout.tsx`; live count badges (`getAdminDrawerCounts`) pending |
 | `lib/screens/admin/admin_history.dart` | 743 | 🟡 Shell | Route stub `(admin)/history.tsx` |
-| `lib/screens/admin/admin_live_chat.dart` | 975 | 🟡 Shell | Route stub `(admin)/live-chat.tsx` |
+| `lib/screens/admin/admin_live_chat.dart` | 975 | ✅ Done | `(admin)/live-chat.tsx` (inbox + conversation, live-request accept/decline) + `components/chat/*` + `lib/chat.ts` |
 | `lib/screens/admin/admin_mechanics.dart` | 987 | 🟡 Shell | Route stub `(admin)/mechanics.tsx` |
 | `lib/screens/admin/admin_orders.dart` | 786 | 🟡 Shell | Route stub `(admin)/orders.tsx` |
 | `lib/screens/admin/admin_pages.dart` | 1093 | ⬜ Pending |  |
@@ -71,7 +71,7 @@ Target: Expo SDK 57 · React Native 0.86 · TypeScript · Expo Router (file-base
 | `lib/screens/customer/edit_profile_screen.dart` | 482 | ⬜ Pending |  |
 | `lib/screens/customer/forgot_password_screen.dart` | 165 | ⏭ Skipped | Skipped — unreferenced duplicate of `screens/forgot_password_screen.dart`. |
 | `lib/screens/customer/home_screen.dart` | 701 | ✅ Done | `(customer)/_layout.tsx` (tabs) + `(customer)/index.tsx` (home content) |
-| `lib/screens/customer/live_chat_screen.dart` | 1668 | 🟡 Shell | Route stub `(customer)/chat.tsx` |
+| `lib/screens/customer/live_chat_screen.dart` | 1668 | ✅ Done | `(customer)/chat.tsx` (bot / waiting / live modes) + `components/chat/*` + `lib/chat.ts` |
 | `lib/screens/customer/my_inquiries_screen.dart` | 295 | 🟡 Shell | Route stub `src/app/my-inquiries.tsx` |
 | `lib/screens/customer/my_orders_screen.dart` | 365 | ✅ Done | `src/app/my-orders.tsx` |
 | `lib/screens/customer/my_vehicles_screen.dart` | 933 | 🟡 Shell | Route stub `src/app/my-vehicles.tsx` |
