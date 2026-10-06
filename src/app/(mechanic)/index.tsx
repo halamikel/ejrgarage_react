@@ -3,19 +3,21 @@
 // "Available for jobs" is a switch. While on, the mechanic can also mark
 // themselves Busy (on_duty) or On Leave (on_break); both stop the admin from
 // assigning new jobs. Switching off sets 'unavailable'.
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Card, Meta, Pill, SmallButton, useAdminList, type IconName } from '@/components/admin';
 import { DatePickerModal, startOfDay, ymd } from '@/components/DatePickerModal';
 import { JobCard, MechanicShell, dayOf, niceDate, timeOnly, todayKey, useFocusReload, vehicleOf } from '@/components/mechanic';
+import { AverageRating, Stars, useAllFeedback } from '@/components/Rating';
 import { Sheet } from '@/components/Sheet';
 import { useToast } from '@/components/Toast';
 import { Field, PrimaryButton } from '@/components/ui';
 import { ApiException, api, type Json } from '@/services/api';
+import { statsForAppointments } from '@/services/jobFeedback';
 import { useUserSession, userSession } from '@/services/session';
 import { colors, fonts, text } from '@/theme/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 const SUBSTATES = [
   { value: 'available', label: 'Available', color: colors.green },
@@ -87,6 +89,8 @@ export default function MechanicHome() {
   }
 
   const all = jobs.items;
+  const allFeedback = useAllFeedback();
+  const myRating = statsForAppointments(allFeedback, all.map((j) => j.id));
   const todayJobs = all.filter((j) => dayOf(j) === todayKey() && j.status !== 'Cancelled').sort((a, b) => String(a.appointment_date).localeCompare(String(b.appointment_date)));
   const upcoming = all
     .filter((j) => dayOf(j) > todayKey() && ACTIVE.includes(String(j.status)))
@@ -136,6 +140,17 @@ export default function MechanicHome() {
                 })}
               </View>
             )}
+          </Card>
+
+          {/* Customer rating */}
+          <Card>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View>
+                <Text style={{ fontFamily: fonts.semibold, fontSize: 15 }}>My Customer Rating</Text>
+                <View style={{ marginTop: 4 }}><AverageRating stats={myRating} /></View>
+              </View>
+              {myRating ? <Stars value={myRating.average} size={18} /> : null}
+            </View>
           </Card>
 
           {/* Stats */}

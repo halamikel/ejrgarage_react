@@ -1,13 +1,15 @@
 // Admin > Mechanics. Backend: admin/manage_mechanics.php (list/add/update/delete).
-import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
-import { Card, CardActions, ListScreen, Meta, Pill, SearchBar, SmallButton, useAdminList, useRunner, matches } from '@/components/admin';
+import { Card, CardActions, ListScreen, matches, Meta, Pill, SearchBar, SmallButton, useAdminList, useRunner } from '@/components/admin';
+import { AverageRating, useAllFeedback } from '@/components/Rating';
 import { Select } from '@/components/Select';
 import { Sheet } from '@/components/Sheet';
 import { Field, PrimaryButton } from '@/components/ui';
 import { confirm } from '@/lib/dialogs';
 import { api, type Json } from '@/services/api';
+import { statsForMechanicName } from '@/services/jobFeedback';
 import { colors, fonts, text } from '@/theme/theme';
+import { useMemo, useState } from 'react';
+import { Text, View } from 'react-native';
 
 // Same four states update_availability.php / manage_mechanics.php accept.
 const STATUSES = [
@@ -28,6 +30,7 @@ export default function AdminMechanics() {
   const [q, setQ] = useState('');
   const [form, setForm] = useState<Form | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const allFeedback = useAllFeedback();
 
   const data = useMemo(() => list.items.filter((m) => matches(q, m.name, m.specialty)), [list.items, q]);
 
@@ -74,6 +77,7 @@ export default function AdminMechanics() {
               <Pill label={statusLabel(m.status)} color={statusColor(m.status)} />
             </View>
             <Meta icon="construct-outline">{m.specialty || 'No specialty set'}</Meta>
+            <View style={{ marginTop: 6 }}><AverageRating stats={statsForMechanicName(allFeedback, m.name)} /></View>
             <CardActions>
               <SmallButton
                 label="Edit"

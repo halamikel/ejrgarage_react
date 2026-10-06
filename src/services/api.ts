@@ -4,8 +4,8 @@
 // is kept in secure storage and attached as a Bearer token to every
 // authenticated request.
 
-import { secureStorage } from './secureStorage';
 import { Platform } from 'react-native';
+import { secureStorage } from './secureStorage';
 
 // Responses are loosely-typed JSON from the PHP backend (the Dart code used
 // Map<String, dynamic> everywhere). Tighten these per-screen as you port them.
@@ -219,6 +219,24 @@ class ApiService {
     const res = await netFetch(`${ApiService.baseUrl}${endpoint}`, { headers: BASE_HEADERS });
     const body = await readJson(res);
     if (body.status === 'error') {
+      throw new ApiException(body.message ?? 'Request failed.', { statusCode: res.status });
+    }
+    return body;
+  }
+
+  /**
+   * Authenticated GET for background checks. Unlike get(), a 401 here never
+   * clears the token / logs the user out — it just throws, and the caller retries later.
+   */
+  async getQuiet(endpoint: string): Promise<Json> {
+    const token = await this.getToken();
+    if (token == null) throw new ApiException('Not logged in.', { statusCode: 401 });
+    const res = await netFetch(`${ApiService.baseUrl}${endpoint}`, {
+      method: 'GET',
+      headers: { ...BASE_HEADERS, Authorization: `Bearer ${token}` },
+    });
+    const body = await readJson(res);
+    if (res.status === 401 || body.status === 'error') {
       throw new ApiException(body.message ?? 'Request failed.', { statusCode: res.status });
     }
     return body;
@@ -796,3 +814,4 @@ class ApiService {
 
 export const api = new ApiService();
 export { ApiService };
+

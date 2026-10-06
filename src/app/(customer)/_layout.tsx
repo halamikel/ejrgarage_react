@@ -1,12 +1,13 @@
 // Port of the BottomNavigationBar in lib/screens/customer/home_screen.dart.
+import { CartButton } from '@/components/CartButton';
+import { FeedbackGate } from '@/components/FeedbackGate';
+import { useRoleGuard } from '@/lib/RoleGuard';
+import { cart } from '@/services/cart';
+import { colors, fonts } from '@/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
 import type { ColorValue } from 'react-native';
-import { useRoleGuard } from '@/lib/RoleGuard';
-import { cart } from '@/services/cart';
-import { CartButton } from '@/components/CartButton';
-import { colors, fonts } from '@/theme/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 const icon = (on: IconName, off: IconName) =>
@@ -23,6 +24,8 @@ export default function CustomerLayout() {
   if (guard) return guard;
 
   return (
+    <>
+    <FeedbackGate />
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -58,5 +61,6 @@ export default function CustomerLayout() {
       <Tabs.Screen name="chat" options={{ title: 'Chat', tabBarIcon: icon('chatbubble', 'chatbubble-outline') }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: icon('person', 'person-outline') }} />
     </Tabs>
+    </>
   );
 }

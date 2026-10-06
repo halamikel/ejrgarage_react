@@ -1,13 +1,15 @@
 // Port of lib/screens/customer/appointment_screen.dart.
-import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FeedbackSummary } from '@/components/Rating';
 import { Sheet } from '@/components/Sheet';
 import { useToast } from '@/components/Toast';
 import { confirm } from '@/lib/dialogs';
 import { appointmentStatusColor, formatDateTime } from '@/lib/format';
 import { ApiException, api, type Json } from '@/services/api';
+import { getFeedbackMap, type JobFeedback } from '@/services/jobFeedback';
 import { colors, fonts, text } from '@/theme/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 export default function AppointmentsScreen() {
   const toast = useToast();
@@ -17,6 +19,7 @@ export default function AppointmentsScreen() {
   const [appointments, setAppointments] = useState<Json[]>([]);
   const [selected, setSelected] = useState<Json | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [feedback, setFeedback] = useState<Record<string, JobFeedback>>({});
 
   const load = useCallback(async (pull = false) => {
     if (pull) setRefreshing(true);
@@ -25,6 +28,7 @@ export default function AppointmentsScreen() {
     try {
       const res = await api.get('get_appointments.php');
       setAppointments((res.appointments as Json[]) ?? []);
+      setFeedback(await getFeedbackMap());
     } catch (e) {
       setError(e instanceof ApiException ? e.message : 'Could not load appointments. Check your connection.');
     } finally {
@@ -132,6 +136,7 @@ export default function AppointmentsScreen() {
             <Row label="Appointment Date" value={formatDateTime(sel.appointment_date)} />
             <Row label="Mechanic" value={sel.mechanic_name ? String(sel.mechanic_name) : 'Not yet assigned'} />
             <Row label="Booked On" value={formatDateTime(sel.created_at)} />
+            {selId != null && feedback[String(selId)] && <FeedbackSummary feedback={feedback[String(selId)]} />}
 
             {canCancel && (
               <Pressable

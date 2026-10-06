@@ -1,14 +1,16 @@
 // Shared pieces for the mechanic tabs (they have no navigation header, so each
 // screen draws its own title), plus the job card used on Home and Bookings.
-import { Image } from 'expo-image';
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useRef, type ReactNode } from 'react';
-import { Linking, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card, Meta, Pill } from '@/components/admin';
+import { FeedbackSummary } from '@/components/Rating';
 import { appointmentStatusColor, formatDateTime } from '@/lib/format';
 import { ApiService, type Json } from '@/services/api';
+import { getFeedbackMap, type JobFeedback } from '@/services/jobFeedback';
 import { colors, fonts, text } from '@/theme/theme';
+import { Image } from 'expo-image';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Linking, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export function MechanicShell({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
@@ -105,6 +107,11 @@ export const vehicleOf = (j: Json) => {
 /** One assigned job. Pass action buttons as children. */
 export function JobCard({ job, children }: { job: Json; children?: ReactNode }) {
   const status = String(job.status ?? 'Pending');
+  const [feedback, setFeedback] = useState<JobFeedback | null>(null);
+  useEffect(() => {
+    if (status !== 'Completed') return setFeedback(null);
+    getFeedbackMap().then((m) => setFeedback(m[String(job.id)] ?? null));
+  }, [job.id, status]);
   return (
     <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -115,6 +122,7 @@ export function JobCard({ job, children }: { job: Json; children?: ReactNode }) 
       <Meta icon="construct-outline">{job.service_type}</Meta>
       <Meta icon="car-outline">{vehicleOf(job)}</Meta>
       <Meta icon="calendar-outline">{job.appointment_date ? formatDateTime(job.appointment_date) : ''}</Meta>
+      {feedback && <FeedbackSummary feedback={feedback} />}
       {children}
     </Card>
   );
