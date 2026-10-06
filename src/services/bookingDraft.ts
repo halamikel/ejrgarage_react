@@ -10,19 +10,23 @@ export type BookingVehicle = {
   appointmentDate: string; // 'YYYY-MM-DD'
 };
 
-type Draft = { vehicle: BookingVehicle | null; notes: string; services: string[] };
+/** Optional preferred mechanic; null = no preference (shop assigns one). */
+export type BookingMechanic = { id: number; name: string };
 
-let draft: Draft = { vehicle: null, notes: '', services: [] };
+type Draft = { vehicle: BookingVehicle | null; notes: string; services: string[]; mechanic: BookingMechanic | null };
+
+const EMPTY: Draft = { vehicle: null, notes: '', services: [], mechanic: null };
+let draft: Draft = EMPTY;
 
 export const bookingDraft = {
   get: (): Draft => draft,
-  setDetails(vehicle: BookingVehicle, notes: string) {
-    draft = { vehicle, notes, services: [] };
+  setDetails(vehicle: BookingVehicle, notes: string, mechanic: BookingMechanic | null = null) {
+    draft = { vehicle, notes, services: [], mechanic };
   },
   setServices(services: string[]) {
     draft = { ...draft, services };
   },
   clear() {
-    draft = { vehicle: null, notes: '', services: [] };
+    draft = EMPTY;
   },
 };

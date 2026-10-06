@@ -9,7 +9,7 @@ import { colors, fonts, text } from '@/theme/theme';
 
 export default function BookingConfirmationScreen() {
   const router = useRouter();
-  const { vehicle, services, notes } = bookingDraft.get();
+  const { vehicle, services, notes, mechanic } = bookingDraft.get();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +20,7 @@ export default function BookingConfirmationScreen() {
     try {
       // `notes` is collected for parity with the web form but, as in the Flutter
       // app, save_booking.php isn't sent it.
-      await api.submitBooking({ services, vehicle: { ...vehicle } });
+      await api.submitBooking({ services, vehicle: { ...vehicle }, mechanicId: mechanic?.id ?? null });
       bookingDraft.clear();
       // Flutter: popUntil(first) then push(AppointmentScreen).
       router.dismissAll();
@@ -49,6 +49,7 @@ export default function BookingConfirmationScreen() {
     ['Transmission', vehicle.transmission],
     ['Fuel Type', vehicle.fuel],
     ['Appointment Date', vehicle.appointmentDate],
+    ['Mechanic', mechanic ? mechanic.name : 'No preference'],
   ];
 
   return (

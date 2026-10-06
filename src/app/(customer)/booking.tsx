@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DatePickerModal, startOfDay, ymd } from '@/components/DatePickerModal';
+import { MechanicPicker } from '@/components/MechanicPicker';
+import { useAllFeedback } from '@/components/Rating';
 import { Select } from '@/components/Select';
 import { ErrorBanner, Field, PrimaryButton } from '@/components/ui';
 import { FUEL_TYPES, TRANSMISSIONS, VEHICLE_BRANDS, VEHICLE_MODELS, buildYearList } from '@/lib/vehicleData';
@@ -35,6 +37,10 @@ export default function BookingDetailsTab() {
   const [transmission, setTransmission] = useState<string | null>(null);
   const [fuel, setFuel] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
+  const [mechanics, setMechanics] = useState<Json[]>([]);
+  const [mechanicId, setMechanicId] = useState<number | null>(null);
+  const [mechanicsState, setMechanicsState] = useState<'loading' | 'ok' | 'error'>('loading');
+  const localFeedback = useAllFeedback();
   const [error, setError] = useState<string | null>(null);
 
   const years = useMemo(buildYearList, []);
@@ -60,6 +66,17 @@ export default function BookingDetailsTab() {
         setBusyDates(new Set(keys));
       } catch {
         // busy dates are best-effort
+      }
+    })();
+    (async () => {
+      try {
+        const res = await api.getMechanics();
+        setMechanics(((res.mechanics as Json[]) ?? []).filter((m) => m?.id != null));
+        setMechanicsState('ok');
+      } catch (e) {
+        // Optional feature: booking still works, but say why the list is empty.
+        console.warn('get_mechanics.php failed', e);
+        setMechanicsState('error');
       }
     })();
   }, []);
@@ -104,7 +121,8 @@ export default function BookingDetailsTab() {
       }
       vehicle = { brand, model, year, plate: plate.trim(), transmission, fuel, appointmentDate };
     }
-    bookingDraft.setDetails(vehicle, notesText);
+    const chosen = mechanics.find((m) => Number(m.id) === mechanicId);
+    bookingDraft.setDetails(vehicle, notesText, chosen ? { id: Number(chosen.id), name: String(chosen.name) } : null);
     router.push('/select-services');
   }
 
@@ -205,6 +223,27 @@ export default function BookingDetailsTab() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, marginBottom: 24 }}>
             <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.red }} />
             <Text style={text.bodySmall}>Fully booked dates are disabled</Text>
+          </View>
+
+          <Text style={[text.headingSmall, { fontSize: 16, marginBottom: 4 }]}>Preferred Mechanic (Optional)</Text>
+          <Text style={[text.bodySmall, { marginBottom: 8 }]}>Pick who works on your vehicle, or leave it and we'll assign one.</Text>
+          <View style={{ marginBottom: 24 }}>
+            {mechanicsState === 'loading' ? (
+              <ActivityIndicator color={colors.primary} style={{ alignSelf: 'flex-start' }} />
+            ) : mechanics.length > 0 ? (
+              <MechanicPicker
+                mechanics={mechanics}
+                selectedId={mechanicId}
+                onSelect={(m) => setMechanicId(m ? Number(m.id) : null)}
+                localFeedback={localFeedback}
+              />
+            ) : (
+              <Text style={[text.bodySmall, { color: colors.grey }]}>
+                {mechanicsState === 'error'
+                  ? 'Mechanic list is unavailable right now. You can still book and we will assign one.'
+                  : 'No mechanics available to choose right now. We will assign one.'}
+              </Text>
+            )}
           </View>
 
           <Text style={[text.headingSmall, { fontSize: 16, marginBottom: 8 }]}>Additional Notes</Text>

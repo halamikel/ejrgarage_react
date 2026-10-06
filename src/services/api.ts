@@ -474,8 +474,19 @@ class ApiService {
   cancelAppointment(appointmentId: number) {
     return this.post('cancel_appointment.php', { id: appointmentId });
   }
-  submitBooking(a: { services: string[]; vehicle: Record<string, string> }) {
-    return this.post('save_booking.php', { services: a.services, vehicle: a.vehicle });
+  /**
+   * Mechanics a customer can pick when booking. Each row: id, name, specialty,
+   * status, profile_picture?, avg_rating (number|null), rating_count (number).
+   * See docs/MECHANIC_SELECTION.md for the PHP endpoint this expects.
+   */
+  getMechanics() {
+    return this.get('get_mechanics.php');
+  }
+  submitBooking(a: { services: string[]; vehicle: Record<string, string>; mechanicId?: number | null }) {
+    const body: Json = { services: a.services, vehicle: a.vehicle };
+    // Optional: omitted entirely when the customer has no preference.
+    if (a.mechanicId != null) body.mechanic_id = a.mechanicId;
+    return this.post('save_booking.php', body);
   }
 
   // ── Mechanic ────────────────────────────────────────────────
@@ -814,4 +825,3 @@ class ApiService {
 
 export const api = new ApiService();
 export { ApiService };
-
