@@ -332,7 +332,13 @@ class ApiService {
   }
 
   /** Creates an unverified account and emails a verification LINK. Does not log in. */
-  async register(args: { name: string; email: string; phone: string; password: string }): Promise<void> {
+  async register(args: {
+    name: string;
+    email: string;
+    phone: string;
+    password: string;
+    referral_code?: string;
+  }): Promise<void> {
     const { res, body } = await this.publicPost('register.php', args);
     if (body.status !== 'success') {
       throw new ApiException(body.message ?? 'Registration failed.', { statusCode: res.status });
@@ -473,6 +479,9 @@ class ApiService {
   }
   cancelAppointment(appointmentId: number) {
     return this.post('cancel_appointment.php', { id: appointmentId });
+  }
+  submitFeedback(data: { appointment_id: number; rating: number; comment?: string }) {
+    return this.post('submit_feedback.php', data);
   }
   /**
    * Mechanics a customer can pick when booking. Each row: id, name, specialty,

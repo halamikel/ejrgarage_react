@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from '@/components/ui';
 import { logout } from '@/lib/auth';
@@ -52,6 +52,22 @@ export default function CustomerProfile() {
           </View>
           <Text style={[text.headingSmall, { marginTop: 14 }]}>{session.displayName}</Text>
           <Text style={[text.bodyMedium, { marginTop: 2 }]}>{session.email}</Text>
+
+          <View style={styles.pointsContainer}>
+            <View style={styles.pointsBox}>
+              <Ionicons name="star" size={20} color={colors.primary} />
+              <View>
+                <Text style={styles.pointsValue}>{session.points}</Text>
+                <Text style={styles.pointsLabel}>Available Points</Text>
+              </View>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Pressable style={styles.redeemBtn}>
+                <Text style={styles.redeemText}>Redeem</Text>
+              </Pressable>
+              <Text style={{ fontSize: 10, color: colors.grey, marginTop: 4 }}>ID: {user?.id}</Text>
+            </View>
+          </View>
         </View>
 
         <View style={{ borderRadius: 16, borderWidth: 1, borderColor: colors.greyBorder, overflow: 'hidden', marginBottom: 28 }}>
@@ -84,3 +100,44 @@ export default function CustomerProfile() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  pointsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.greyBorder,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 20,
+    width: '100%',
+  },
+  pointsBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  pointsValue: {
+    fontFamily: fonts.bold,
+    fontSize: 18,
+    color: colors.black,
+  },
+  pointsLabel: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    color: colors.grey,
+  },
+  redeemBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  redeemText: {
+    fontFamily: fonts.semibold,
+    fontSize: 13,
+    color: colors.white,
+  },
+});

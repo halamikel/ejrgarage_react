@@ -5,7 +5,7 @@
 // endpoints (save + list) and replace readAll()/submitJobFeedback() below while
 // keeping the same exported function signatures.
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Json } from './api';
+import { api, type Json } from './api';
 
 export type JobFeedback = {
   appointmentId: string;
@@ -58,11 +58,19 @@ export async function submitJobFeedback(input: {
   if (!(rating >= MIN_RATING && rating <= MAX_RATING)) {
     throw new Error('Please choose a rating from 1 to 5 stars.');
   }
-  const id = String(input.appointmentId);
+  const id = Number(input.appointmentId);
   const all = await readAll();
-  if (all.some((f) => f.appointmentId === id)) return all.find((f) => f.appointmentId === id)!;
+  if (all.some((f) => Number(f.appointmentId) === id)) return all.find((f) => Number(f.appointmentId) === id)!;
+
+  // Sync to backend
+  await api.submitFeedback({
+    appointment_id: id,
+    rating,
+    comment: (input.comment ?? '').trim(),
+  });
+
   const feedback: JobFeedback = {
-    appointmentId: id,
+    appointmentId: String(id),
     rating,
     comment: (input.comment ?? '').trim(),
     mechanicName: input.mechanicName,

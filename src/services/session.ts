@@ -55,6 +55,9 @@ class UserSession {
   get email(): string {
     return (this._user?.email ?? '') as string;
   }
+  get points(): number {
+    return Number(this._user?.points ?? 0);
+  }
 
   // Role IDs from the EJR Garage PHP backend (1: Customer, 2: Admin, 3: Mechanic).
   // String-compare to be safe against both int and string JSON values.
