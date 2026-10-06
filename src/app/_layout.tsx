@@ -13,7 +13,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { onUnauthorized } from '@/services/api';
 import { initNotifications, stopPolling } from '@/services/notifications';
-import { userSession } from '@/services/session';
+import { restoreSession, userSession } from '@/services/session';
 import { ToastProvider } from '@/components/Toast';
 import { colors, fonts } from '@/theme/theme';
 
@@ -45,6 +45,9 @@ export default function RootLayout() {
 
   useEffect(() => {
     initNotifications();
+    // Restore the login from the stored token (matters on web, where a refresh
+    // reloads the page straight into a role area, skipping the splash).
+    restoreSession();
   }, []);
 
   // Token expired mid-session -> back to the welcome screen. Ignored when no
@@ -78,6 +81,8 @@ export default function RootLayout() {
             <Stack.Screen name="my-orders" options={pushed('My Orders')} />
             <Stack.Screen name="my-inquiries" options={pushed('My Inquiries')} />
             <Stack.Screen name="my-vehicles" options={pushed('My Vehicles')} />
+            <Stack.Screen name="edit-profile" options={pushed('Edit Profile')} />
+            <Stack.Screen name="settings" options={pushed('Settings')} />
             <Stack.Screen name="appointments" options={pushed('Appointment')} />
             <Stack.Screen name="select-services" options={pushed('Select Services')} />
             <Stack.Screen name="booking-confirmation" options={pushed('Confirm Booking')} />

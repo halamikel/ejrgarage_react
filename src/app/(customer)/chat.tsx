@@ -1,187 +1,252 @@
-// Customer live chat (port of lib/screens/customer/live_chat_screen.dart).
+// Port of lib/screens/customer/live_chat_screen.dart.
+// Backend: check_session.php "type" dispatcher (get_messages / chat / end_session).
 //
-// Three modes, driven by the server:
-//   bot     -> automated assistant answers
-//   pending -> customer asked for a person and is waiting for staff to accept
-//   live    -> talking to staff
-import { Composer } from '@/components/chat/Composer';
-import { MessageList } from '@/components/chat/MessageList';
-import { useToast } from '@/components/Toast';
-import { chatModeOf, normalizeMessages, usePolling, type ChatMessage, type ChatMode } from '@/lib/chat';
-import { confirm } from '@/lib/dialogs';
-import { ApiException, api } from '@/services/api';
-import { colors, fonts, text } from '@/theme/theme';
+// How the backend works (and why this screen is built the way it is):
+//  - Bot mode: the server answers each message from its keyword table but does
+//    NOT store the conversation, so the bot half of the chat lives in this app.
+//  - "request_live" puts the customer straight into a LIVE session and wipes the
+//    stored history. From then on messages are stored server-side, so they are
+//    polled with get_messages. The admin's own live-chat screen shows the same thread.
+//  - end_session returns the customer to the bot and deletes the live history.
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pill, SmallButton } from '@/components/admin';
+import { useToast } from '@/components/Toast';
+import { confirm } from '@/lib/dialogs';
+import { ApiException, api, type Json } from '@/services/api';
+import { colors, fonts, text } from '@/theme/theme';
 
-const STATUS: Record<ChatMode, { label: string; color: string }> = {
-  bot: { label: 'Automated assistant', color: colors.blue },
-  pending: { label: 'Waiting for a staff member…', color: colors.statusPending },
-  live: { label: 'Live with EJR staff', color: colors.green },
-};
+type Msg = { sender: 'user' | 'bot' | 'admin'; message: string; time: string };
 
-const PLACEHOLDER: Record<ChatMode, string> = {
-  bot: 'Ask about services, prices, hours…',
-  pending: 'Message the assistant while you wait…',
-  live: 'Message our staff…',
-};
+const GREETING =
+  'Hi! I\'m the EJR Garage assistant. Ask me about our services, prices, hours or booking, or tap "Talk to a live agent" to chat with our team.';
+const LIVE_INTRO = 'You are now connected to EJR Garage support. How can we help you?';
+// Internal lines the backend inserts for the admin's benefit; customers shouldn't see them.
+const SYSTEM_LINES = ['A customer has started a live chat.', 'A user has requested live assistance.'];
 
-export default function CustomerChatScreen() {
+// Same quick choices as the website's chat widget. Each is sent as the user's
+// message and matches a keyword in the backend's ejr_bot table.
+const QUICK_CHOICES = ['Services Offered', 'Booking Help', 'Operating Hours', 'Location', 'Contact'];
+
+const nowLabel = () => new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const botMsg = (message: string): Msg => ({ sender: 'bot', message, time: nowLabel() });
+
+export default function ChatScreen() {
   const toast = useToast();
-  const [server, setServer] = useState<ChatMessage[]>([]);
-  // Messages the user just sent that the server hasn't echoed back yet.
-  const [outbox, setOutbox] = useState<ChatMessage[]>([]);
-  const [mode, setMode] = useState<ChatMode>('bot');
-  const [offline, setOffline] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [mode, setMode] = useState<'bot' | 'live'>('bot');
+  const [botMsgs, setBotMsgs] = useState<Msg[]>([botMsg(GREETING)]);
+  const [liveMsgs, setLiveMsgs] = useState<Msg[]>([]);
+  const [input, setInput] = useState('');
+  const [typing, setTyping] = useState(false);
   const [busy, setBusy] = useState(false);
+  const scroll = useRef<ScrollView>(null);
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
-  const refresh = useCallback(async () => {
+  /** Asks the server whether we're in a live session and, if so, loads it. */
+  const sync = useCallback(async () => {
     try {
       const res = await api.getChatMessages();
-      setServer(normalizeMessages(res));
-      setMode(chatModeOf(res));
-      setOffline(false);
+      if (res.chat_session === 'live') {
+        setMode('live');
+        const list: Json[] = res.messages ?? [];
+        setLiveMsgs(
+          list
+            .filter((m) => !SYSTEM_LINES.includes(String(m.message)))
+            .map((m) => ({ sender: m.sender === 'user' ? 'user' : 'admin', message: String(m.message), time: String(m.time ?? '') })),
+        );
+      } else if (modeRef.current === 'live') {
+        // The admin ended the session.
+        setMode('bot');
+        setLiveMsgs([]);
+        setBotMsgs([botMsg('The live chat has ended. I\'m back, so how can I help?')]);
+      }
     } catch {
-      setOffline(true);
+      // Polling failures are silent; the next tick will try again.
     }
   }, []);
 
-  // Poll faster while a human is (or is about to be) on the other end.
-  usePolling(refresh, mode === 'bot' ? 10000 : 3000);
+  // On focus: check for a live session, and while live keep polling.
+  useFocusEffect(
+    useCallback(() => {
+      let stopped = false;
+      sync().finally(() => !stopped && setReady(true));
+      if (mode !== 'live') return () => { stopped = true; };
+      const t = setInterval(sync, 3000);
+      return () => {
+        stopped = true;
+        clearInterval(t);
+      };
+    }, [mode, sync]),
+  );
 
-  const fail = (e: unknown, fallback: string) =>
-    toast(e instanceof ApiException ? e.message : fallback, 'error');
+  useEffect(() => {
+    const t = setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 50);
+    return () => clearTimeout(t);
+  }, [botMsgs.length, liveMsgs.length, typing, mode, ready]);
 
-  const send = async (body: string) => {
-    const temp: ChatMessage = { id: `local-${Date.now()}`, author: 'customer', text: body, createdAt: null };
-    setOutbox((o) => [...o, temp]);
-    try {
-      await api.sendChatMessage(body);
-      await refresh();
-      setOutbox((o) => o.filter((m) => m.id !== temp.id));
-      return true;
-    } catch (e) {
-      setOutbox((o) => o.filter((m) => m.id !== temp.id));
-      fail(e, 'Message not sent. Check your connection.');
-      return false;
+  async function send(preset?: string) {
+    const msg = (preset ?? input).trim();
+    if (!msg || busy) return;
+    if (preset == null) setInput(''); // tapping a choice shouldn't wipe what's being typed
+    setBusy(true);
+
+    if (mode === 'live') {
+      setLiveMsgs((p) => [...p, { sender: 'user', message: msg, time: nowLabel() }]);
+      try {
+        await api.sendChatMessage(msg);
+        await sync();
+      } catch (e) {
+        toast(e instanceof ApiException ? e.message : 'Message not sent. Try again.', 'error');
+      } finally {
+        setBusy(false);
+      }
+      return;
     }
-  };
 
-  const handoff = async (action: 'request_live' | 'cancel_live_request') => {
+    setBotMsgs((p) => [...p, { sender: 'user', message: msg, time: nowLabel() }]);
+    setTyping(true);
+    try {
+      const res = await api.sendChatMessage(msg);
+      if (res.mode === 'live') await sync(); // a live session was already open
+      else setBotMsgs((p) => [...p, botMsg(String(res.reply || 'Sorry, I didn\'t catch that.'))]);
+    } catch {
+      setBotMsgs((p) => [...p, botMsg('Sorry, I couldn\'t reach the server. Please try again.')]);
+    } finally {
+      setTyping(false);
+      setBusy(false);
+    }
+  }
+
+  async function requestLive() {
+    const ok = await confirm('Talk to a Live Agent?', 'A member of the EJR Garage team will join this chat.', { confirmText: 'Connect' });
+    if (!ok) return;
     setBusy(true);
     try {
-      await api.sendChatMessage('', action);
-      await refresh();
+      await api.sendChatMessage('', 'request_live');
+      setMode('live');
+      setLiveMsgs([]);
+      await sync();
     } catch (e) {
-      fail(e, 'Could not update your request. Please try again.');
+      toast(e instanceof ApiException ? e.message : 'Could not connect you to an agent.', 'error');
     } finally {
       setBusy(false);
     }
-  };
+  }
 
-  const endSession = async () => {
-    const ok = await confirm('End live chat?', 'This ends the session and clears the conversation history.', {
-      confirmText: 'End chat',
-      destructive: true,
-    });
+  async function endLive() {
+    const ok = await confirm('End Live Chat?', 'This ends the chat and clears the conversation.', { confirmText: 'End Chat', destructive: true });
     if (!ok) return;
     setBusy(true);
     try {
       await api.endChatSession();
-      setServer([]);
-      setOutbox([]);
       setMode('bot');
-      await refresh();
+      setLiveMsgs([]);
+      setBotMsgs([botMsg(GREETING)]);
     } catch (e) {
-      fail(e, 'Could not end the chat. Please try again.');
+      toast(e instanceof ApiException ? e.message : 'Could not end the chat.', 'error');
     } finally {
       setBusy(false);
     }
-  };
+  }
 
-  const status = STATUS[mode];
-  const action =
-    mode === 'bot'
-      ? { label: 'Talk to a person', icon: 'headset-outline' as const, onPress: () => handoff('request_live'), color: colors.primary }
-      : mode === 'pending'
-        ? { label: 'Cancel request', icon: 'close-circle-outline' as const, onPress: () => handoff('cancel_live_request'), color: colors.greyText }
-        : { label: 'End chat', icon: 'exit-outline' as const, onPress: endSession, color: colors.red };
+  const shown: Msg[] = mode === 'live' ? [{ sender: 'admin', message: LIVE_INTRO, time: '' }, ...liveMsgs] : botMsgs;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.white }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.greyBorder }}>
         <View style={{ flex: 1 }}>
-          <Text style={text.headingSmall}>EJR Support</Text>
-          <View style={styles.statusRow}>
-            <View style={[styles.dot, { backgroundColor: status.color }]} />
-            <Text style={styles.statusText}>{status.label}</Text>
-          </View>
+          <Text style={text.headingMedium}>Chat Support</Text>
+          <Text style={text.bodySmall}>{mode === 'live' ? 'Chatting with the EJR Garage team' : 'Automated assistant'}</Text>
         </View>
-        <Pressable
-          onPress={action.onPress}
-          disabled={busy}
-          accessibilityRole="button"
-          accessibilityLabel={action.label}
-          style={[styles.actionBtn, { borderColor: action.color }, busy && { opacity: 0.5 }]}
-        >
-          <Ionicons name={action.icon} size={16} color={action.color} />
-          <Text style={[styles.actionText, { color: action.color }]}>{action.label}</Text>
-        </Pressable>
+        <Pill label={mode === 'live' ? 'Live' : 'Bot'} color={mode === 'live' ? colors.green : colors.grey} />
+        {mode === 'live' && <SmallButton label="End" icon="close-circle-outline" tone="danger" disabled={busy} onPress={endLive} />}
       </View>
 
-      {offline && (
-        <View style={styles.offline}>
-          <Ionicons name="cloud-offline-outline" size={14} color={colors.red} />
-          <Text style={styles.offlineText}>Can't reach support. Retrying…</Text>
-        </View>
-      )}
-
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <MessageList
-          messages={[...server, ...outbox]}
-          viewer="customer"
-          emptyTitle="Start a conversation"
-          emptyHint="Ask our assistant a question, or tap “Talk to a person” to chat with the shop."
-        />
-        <Composer onSend={send} placeholder={PLACEHOLDER[mode]} />
+        {!ready ? (
+          <ActivityIndicator color={colors.primary} style={{ flex: 1 }} />
+        ) : (
+          <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 10, flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+            {shown.map((m, i) => {
+              const mine = m.sender === 'user';
+              const isBot = m.sender === 'bot';
+              return (
+                <View key={i} style={{ alignItems: mine ? 'flex-end' : 'flex-start' }}>
+                  {!mine && <Text style={{ fontFamily: fonts.semibold, fontSize: 11, color: colors.grey, marginBottom: 2 }}>{isBot ? 'Assistant' : 'Support'}</Text>}
+                  <View
+                    style={{
+                      maxWidth: '82%',
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderRadius: 16,
+                      borderBottomRightRadius: mine ? 4 : 16,
+                      borderBottomLeftRadius: mine ? 16 : 4,
+                      backgroundColor: mine ? colors.primary : isBot ? colors.primaryLight : colors.greyLight,
+                    }}
+                  >
+                    <Text style={{ fontFamily: fonts.regular, fontSize: 14, color: mine ? colors.white : colors.black }}>{m.message}</Text>
+                  </View>
+                  {m.time ? <Text style={{ fontFamily: fonts.regular, fontSize: 10, color: colors.grey, marginTop: 2 }}>{m.time}</Text> : null}
+                </View>
+              );
+            })}
+            {typing && (
+              <View style={{ alignItems: 'flex-start' }}>
+                <View style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, borderBottomLeftRadius: 4, backgroundColor: colors.primaryLight }}>
+                  <Text style={{ fontFamily: fonts.regular, fontSize: 14, color: colors.greyText }}>Typing...</Text>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+        )}
+
+        {mode === 'bot' && ready && (
+          <View style={{ paddingTop: 8 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+              {QUICK_CHOICES.map((q) => (
+                <Pressable
+                  key={q}
+                  disabled={busy}
+                  onPress={() => send(q)}
+                  accessibilityLabel={q}
+                  style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: colors.primaryLight, opacity: busy ? 0.5 : 1 }}
+                >
+                  <Text style={{ fontFamily: fonts.medium, fontSize: 13, color: colors.primary }}>{q}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <View style={{ paddingHorizontal: 16, paddingTop: 10, alignItems: 'flex-start' }}>
+              <SmallButton label="Talk to a live agent" icon="headset-outline" tone="primary" disabled={busy} onPress={requestLive} />
+            </View>
+          </View>
+        )}
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderTopWidth: 1, borderTopColor: colors.greyBorder, marginTop: 8 }}>
+          <TextInput
+            value={input}
+            onChangeText={setInput}
+            placeholder="Type a message"
+            placeholderTextColor={colors.grey}
+            onSubmitEditing={() => send()}
+            returnKeyType="send"
+            editable={ready}
+            style={{ flex: 1, borderWidth: 1, borderColor: colors.greyBorder, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 10, fontFamily: fonts.regular, fontSize: 14, color: colors.black }}
+          />
+          <Pressable
+            onPress={() => send()}
+            disabled={busy || !input.trim()}
+            accessibilityLabel="Send"
+            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', opacity: busy || !input.trim() ? 0.5 : 1 }}
+          >
+            {busy ? <ActivityIndicator color={colors.white} /> : <Ionicons name="send" size={18} color={colors.white} />}
+          </Pressable>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.white },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.greyBorder,
-  },
-  statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-  dot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  statusText: { fontFamily: fonts.regular, fontSize: 12, color: colors.greyText },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  actionText: { fontFamily: fonts.semibold, fontSize: 12 },
-  offline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(244,67,54,0.08)',
-  },
-  offlineText: { fontFamily: fonts.regular, fontSize: 12, color: colors.red },
-});

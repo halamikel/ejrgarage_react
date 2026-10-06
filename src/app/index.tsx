@@ -11,7 +11,7 @@ import { Animated, Easing, Modal, Pressable, StyleSheet, Text, View } from 'reac
 import { api } from '@/services/api';
 import { checkForUpdate } from '@/services/appUpdate';
 import { isDeviceCompromised } from '@/services/deviceIntegrity';
-import { homeRouteForRole, userSession } from '@/services/session';
+import { homeRouteForRole, restoreSession, userSession } from '@/services/session';
 import { colors, fonts, text } from '@/theme/theme';
 
 type Blocker = { kind: 'update'; message: string } | { kind: 'security' } | null;
@@ -53,14 +53,7 @@ export default function SplashScreen() {
         checkForUpdate(),
       ]);
 
-      if (loggedIn) {
-        try {
-          const profile = await api.getProfile();
-          if (profile.user) userSession.setUser(profile.user);
-        } catch (e) {
-          console.log('[Splash] Profile fetch failed:', e);
-        }
-      }
+      if (loggedIn) await restoreSession();
       if (cancelled) return;
 
       if (update.updateRequired) {

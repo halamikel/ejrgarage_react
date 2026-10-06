@@ -5,7 +5,7 @@
 // stored (see app/index.tsx). Components subscribe via useUserSession().
 
 import { useSyncExternalStore } from 'react';
-import { ApiService, type Json } from './api';
+import { api, ApiService, type Json } from './api';
 
 type Listener = () => void;
 
@@ -21,6 +21,21 @@ class UserSession {
     };
   };
   getSnapshot = () => this._user;
+
+  /**
+   * True until we've tried to restore the user from the stored token. A web
+   * refresh wipes memory but keeps the token, so route guards must wait for
+   * this instead of treating "no user yet" as "logged out".
+   */
+  private _restoring = true;
+  get restoring() {
+    return this._restoring;
+  }
+  markRestored() {
+    if (!this._restoring) return;
+    this._restoring = false;
+    this.listeners.forEach((l) => l());
+  }
 
   get user() {
     return this._user;
@@ -79,6 +94,31 @@ class UserSession {
 }
 
 export const userSession = new UserSession();
+
+let restorePromise: Promise<void> | null = null;
+
+/**
+ * Loads the logged-in user from the stored token (get_profile.php). Safe to call
+ * from several places: the work runs once and everyone shares the result. Never
+ * throws; on failure the user simply stays logged out.
+ */
+export function restoreSession(): Promise<void> {
+  if (!restorePromise) {
+    restorePromise = (async () => {
+      try {
+        if (!userSession.user && (await api.isLoggedIn())) {
+          const res = await api.getProfile();
+          if (res.user) userSession.setUser(res.user);
+        }
+      } catch (e) {
+        console.log('[Session] Could not restore session:', e);
+      } finally {
+        userSession.markRestored();
+      }
+    })();
+  }
+  return restorePromise;
+}
 
 /** Re-renders the component whenever the session user changes. */
 export function useUserSession() {
