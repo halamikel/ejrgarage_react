@@ -74,7 +74,7 @@ Target: Expo SDK 57 · React Native 0.86 · TypeScript · Expo Router (file-base
 | `lib/screens/customer/live_chat_screen.dart` | 1668 | ✅ Done | `(customer)/chat.tsx` (bot / waiting / live modes) + `components/chat/*` + `lib/chat.ts` |
 | `lib/screens/customer/my_inquiries_screen.dart` | 295 | 🟡 Shell | Route stub `src/app/my-inquiries.tsx` |
 | `lib/screens/customer/my_orders_screen.dart` | 365 | ✅ Done | `src/app/my-orders.tsx` |
-| `lib/screens/customer/my_vehicles_screen.dart` | 933 | 🟡 Shell | Route stub `src/app/my-vehicles.tsx` |
+| `lib/screens/customer/my_vehicles_screen.dart` | 933 | ✅ Done | `src/app/my-vehicles.tsx` — vehicle health cards, details, recommendations, and history. |
 | `lib/screens/customer/payment_preference_screen.dart` | 238 | ⬜ Pending |  |
 | `lib/screens/customer/payment_screen.dart` | 358 | ⬜ Pending |  |
 | `lib/screens/customer/profile_screen.dart` | 297 | 🟡 Shell | Basic version (`ProfileSummary`: avatar, name, email, logout); menu list pending -> `(customer)/profile.tsx` |
@@ -91,7 +91,7 @@ Target: Expo SDK 57 · React Native 0.86 · TypeScript · Expo Router (file-base
 | `lib/screens/mechanic/models/dashboard_card_model.dart` | 13 | ⬜ Pending |  |
 | `lib/screens/mechanic/screens/booking_confirmation_screen.dart` | 290 | ⬜ Pending |  |
 | `lib/screens/mechanic/screens/booking_details_screen.dart` | 351 | ⬜ Pending |  |
-| `lib/screens/mechanic/screens/booking_screen.dart` | 280 | 🟡 Shell | Route stub `(mechanic)/bookings.tsx` |
+| `lib/screens/mechanic/screens/booking_screen.dart` | 280 | ✅ Done | `(mechanic)/bookings.tsx` — job status management and Vehicle Health inspections. |
 | `lib/screens/mechanic/screens/chat_screen.dart` | 136 | ⬜ Pending |  |
 | `lib/screens/mechanic/screens/customer_details_screen.dart` | 376 | ⬜ Pending |  |
 | `lib/screens/mechanic/screens/customers_screen.dart` | 280 | 🟡 Shell | Route stub `(mechanic)/customers.tsx` |

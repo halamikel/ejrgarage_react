@@ -2,6 +2,10 @@
 
 React Native / Expo port of the Flutter `ejr_mobile` app. See **MIGRATION.md** for what's ported and what's left.
 
+## Feature documentation
+
+- [Vehicle Health](docs/VEHICLE_HEALTH.md) — mechanic inspection workflow, automatic scoring, customer view, and current data-storage behaviour.
+
 ## Run it
 
 ```bash
