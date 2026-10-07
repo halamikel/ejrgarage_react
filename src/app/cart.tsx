@@ -211,6 +211,7 @@ function removeVoucher() {
         items: cart.toOrderItems(),
         totalPrice: cart.totalPrice,
         paymentMethod: method,
+        voucherCode: voucherApplied ? voucherCode : undefined,
       });
       if (res.status !== 'success') throw new ApiException(res.message ?? 'Order failed.');
       cart.clear();
@@ -243,7 +244,8 @@ function removeVoucher() {
         contact: selected.contact.trim(),
         address: formatAddress(selected.address),
         items: cart.toOrderItems(),
-        totalPrice: total,
+        totalPrice: cart.totalPrice,
+        voucherCode: voucherApplied ? voucherCode : undefined,
       });
       if (res.status !== 'success' || res.qr_image == null || res.order_id == null) {
         throw new ApiException(res.message ?? 'Could not generate QR code.');

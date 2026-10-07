@@ -1,14 +1,50 @@
 import { useToast } from '@/components/Toast';
 import { confirm } from '@/lib/dialogs';
 import { ApiException, api, type Json } from '@/services/api';
-import { useUserSession, userSession } from '@/services/session';
+import { refreshPoints, useUserSession, userSession } from '@/services/session';
 import { colors, fonts, text } from '@/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// Vouchers are valid for 30 days from the day they are claimed.
+const VOUCHER_VALID_DAYS = 30;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function parseDbDate(raw: unknown): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/.exec(String(raw ?? ''));
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4] ?? 0), Number(m[5] ?? 0));
+}
+
+/** Server's expires_at if present, otherwise claim date + 30 days. */
+function voucherExpiry(v: Json): Date | null {
+  const exp = parseDbDate(v.expires_at);
+  if (exp) return exp;
+  const claimed = parseDbDate(v.claimed_at ?? v.created_at);
+  if (!claimed) return null;
+  claimed.setDate(claimed.getDate() + VOUCHER_VALID_DAYS);
+  return claimed;
+}
+
+function voucherState(v: Json): { label: string; usable: boolean } {
+  if (v.used_at || v.is_used === 1 || v.is_used === '1' || String(v.status).toLowerCase() === 'used') {
+    return { label: 'Used', usable: false };
+  }
+  const exp = voucherExpiry(v);
+  if (!exp) return { label: 'Active', usable: true };
+  const msLeft = exp.getTime() - Date.now();
+  if (msLeft <= 0) return { label: 'Expired', usable: false };
+  const days = Math.ceil(msLeft / 86_400_000);
+  return { label: days === 1 ? '1 day left' : `${days} days left`, usable: true };
+}
+
+function formatDate(d: Date | null) {
+  return d ? `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}` : '';
+}
 
 export default function RewardsScreen() {
   const toast = useToast();
@@ -18,6 +54,8 @@ export default function RewardsScreen() {
   const [rewards, setRewards] = useState<Json[]>([]);
   const [vouchers, setVouchers] = useState<Json[]>([]);
   const [claiming, setClaiming] = useState<number | null>(null);
+  // Synchronous guard: state updates are async, so a fast double-tap could fire two claims.
+  const claimLock = useRef(false);
   const [activeTab, setActiveTab] = useState<'available' | 'my'>('available');
 
   const load = useCallback(async (pull = false) => {
@@ -56,42 +94,66 @@ export default function RewardsScreen() {
     toast('Code copied to clipboard!', 'success');
   }
 
-  function formatExpiry(dateStr: string) {
-    if (!dateStr) return '';
-    try {
-      const [datePart] = dateStr.split(' ');
-      const [y, m, d] = datePart.split('-');
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return `${months[Number(m) - 1]} ${d}, ${y}`;
-    } catch (e) {
-      return dateStr;
-    }
-  }
-
   async function handleClaim(reward: Json) {
+    if (claimLock.current) return;
+
+    const rewardId = Number(reward.id);
     const points = Number(reward.points_required);
+    if (!Number.isFinite(rewardId) || !Number.isFinite(points)) {
+      toast('This reward is unavailable. Pull down to refresh.', 'error');
+      return;
+    }
     if (session.points < points) {
       toast(`You need ${points - session.points} more points to claim this.`, 'error');
       return;
     }
 
-    const ok = await confirm(
-      'Redeem Points?',
-      `Use ${points} EJR points to claim "${reward.title}"?`,
-      { confirmText: 'Redeem Now' }
-    );
-    if (!ok) return;
-
-    setClaiming(Number(reward.id));
+    claimLock.current = true;
     try {
-      const res = await api.claimReward(Number(reward.id));
-      toast(res.message || 'Voucher claimed successfully!', 'success');
-      await load();
-      setActiveTab('my');
-    } catch (e) {
-      toast(e instanceof ApiException ? e.message : 'Failed to redeem points.', 'error');
+      const ok = await confirm(
+        'Redeem Points?',
+        `Use ${points} EJR points to claim "${reward.title}"?`,
+        { confirmText: 'Redeem Now' },
+      );
+      if (!ok) return;
+
+      setClaiming(rewardId);
+      let claimed = false;
+      try {
+        const res = await api.claimReward(rewardId);
+        // The API wrapper only throws on status === 'error'; treat any other
+        // non-success status (or success: false) as a failed claim too.
+        if ((res.status && res.status !== 'success') || res.success === false) {
+          throw new ApiException(res.message ?? 'Failed to redeem points.');
+        }
+        claimed = true;
+
+        // Update the balance right away from the response if the server sends it,
+        // otherwise deduct locally; the refresh below then confirms the real value.
+        const serverBalance = res.points ?? res.new_balance ?? res.balance ?? res.user?.points;
+        if (userSession.user) {
+          const next = serverBalance != null ? Number(serverBalance) : Math.max(0, session.points - points);
+          userSession.setUser({ ...userSession.user, points: next });
+        }
+        const code = res.code ?? res.voucher?.code ?? res.voucher_code;
+        toast(code ? `Voucher claimed! Your code: ${code}` : res.message || 'Voucher claimed successfully!', 'success');
+      } catch (e) {
+        toast(e instanceof ApiException ? e.message : 'Failed to redeem points.', 'error');
+      }
+
+      if (claimed) {
+        // Refresh without the full-screen spinner, and never let a refresh
+        // failure make a successful claim look like it failed.
+        await Promise.allSettled([
+          refreshPoints(),
+          api.getMyVouchers().then((r) => setVouchers((r.vouchers as Json[]) ?? [])),
+          api.getRewards().then((r) => setRewards((r.rewards as Json[]) ?? [])),
+        ]);
+        setActiveTab('my');
+      }
     } finally {
       setClaiming(null);
+      claimLock.current = false;
     }
   }
 
@@ -165,13 +227,14 @@ export default function RewardsScreen() {
         }
         renderItem={({ item }) => {
           if (activeTab === 'my') {
+            const state = voucherState(item);
             return (
-              <View style={styles.rewardCard}>
-                <View style={styles.rewardIcon}>
+              <View style={[styles.rewardCard, !state.usable && styles.rewardCardLocked]}>
+                <View style={[styles.rewardIcon, !state.usable && styles.rewardIconLocked]}>
                   <Ionicons
                     name={item.reward_type === 'shipping' ? 'bus' : 'pricetag'}
                     size={28}
-                    color={colors.primary}
+                    color={state.usable ? colors.primary : colors.grey}
                   />
                 </View>
                 <View style={{ flex: 1, marginLeft: 16 }}>
@@ -181,17 +244,27 @@ export default function RewardsScreen() {
                   <View style={styles.codeContainer}>
                     <Text style={styles.codeLabel}>VOUCHER CODE</Text>
                     <View style={styles.codeRow}>
-                      <Text style={styles.codeValue}>{item.code}</Text>
-                      <Pressable onPress={() => copyToClipboard(item.code)} style={styles.copyBtn}>
-                        <Ionicons name="copy-outline" size={18} color={colors.primary} />
-                      </Pressable>
+                      <Text style={[styles.codeValue, !state.usable && { color: colors.grey, textDecorationLine: 'line-through' }]}>
+                        {item.code}
+                      </Text>
+                      {state.usable && (
+                        <Pressable onPress={() => copyToClipboard(item.code)} style={styles.copyBtn}>
+                          <Ionicons name="copy-outline" size={18} color={colors.primary} />
+                        </Pressable>
+                      )}
                     </View>
                   </View>
 
                   <View style={styles.durationRow}>
                     <Ionicons name="time-outline" size={14} color={colors.grey} />
-                    <Text style={styles.durationText}>Expires: {formatExpiry(item.expires_at)}</Text>
+                    <Text style={styles.durationText}>
+                      {state.usable ? 'Expires' : state.label === 'Used' ? 'Used voucher · was valid until' : 'Expired on'}{' '}
+                      {formatDate(voucherExpiry(item))} · {state.label}
+                    </Text>
                   </View>
+                  {state.usable && (
+                    <Text style={[styles.durationText, { marginTop: 4 }]}>Enter this code at checkout when ordering parts.</Text>
+                  )}
                 </View>
               </View>
             );
@@ -214,7 +287,7 @@ export default function RewardsScreen() {
                 <Text style={[styles.rewardDesc, !canAfford && styles.rewardDescLocked]}>{item.description}</Text>
                 <View style={styles.durationRow}>
                   <Ionicons name="time-outline" size={14} color={colors.grey} />
-                  <Text style={styles.durationText}>Valid for {item.duration_days} days</Text>
+                  <Text style={styles.durationText}>Valid for {VOUCHER_VALID_DAYS} days after claiming</Text>
                 </View>
 
                 {!canAfford && (

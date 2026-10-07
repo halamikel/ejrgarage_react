@@ -417,6 +417,8 @@ class ApiService {
     totalPrice: number;
     /** The Flutter cart sends 'online' | 'cod' (online => PayMongo checkout_url). */
     paymentMethod: 'online' | 'card' | 'cod';
+    /** Voucher code from the cart; the server re-validates it and applies the discount. */
+    voucherCode?: string;
   }) {
     return this.post('place_order.php', {
       customer_name: a.customerName,
@@ -425,6 +427,7 @@ class ApiService {
       items: a.items,
       total_price: a.totalPrice,
       payment_method: a.paymentMethod,
+      voucher_code: a.voucherCode || undefined,
     });
   }
   getMyOrders() {
@@ -433,13 +436,14 @@ class ApiService {
   cancelOrder(orderId: number) {
     return this.post('cancel_order.php', { id: orderId });
   }
-  createQrphPayment(a: { customerName: string; contact: string; address: string; items: Json[]; totalPrice: number }) {
+  createQrphPayment(a: { customerName: string; contact: string; address: string; items: Json[]; totalPrice: number; voucherCode?: string }) {
     return this.post('create_qrph_payment.php', {
       customer_name: a.customerName,
       contact: a.contact,
       address: a.address,
       items: a.items,
       total_price: a.totalPrice,
+      voucher_code: a.voucherCode || undefined,
     });
   }
   checkQrphStatus(orderId: number) {
@@ -845,3 +849,4 @@ class ApiService {
 
 export const api = new ApiService();
 export { ApiService };
+
