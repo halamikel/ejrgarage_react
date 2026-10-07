@@ -46,7 +46,7 @@ export default function CustomerLayout() {
       <Tabs.Screen
         name="parts"
         options={{
-          title: 'Parts',
+          title: 'Shop',
           tabBarIcon: icon('build', 'build-outline'),
           // Flutter's "Available Parts" AppBar with the cart badge.
           headerShown: true,

@@ -1,15 +1,15 @@
 // Port of _HomeContent in lib/screens/customer/home_screen.dart.
+import { RatingSheet } from '@/components/Rating';
+import { appointmentStatusColor, formatDateTime, iconForService } from '@/lib/format';
+import { ApiException, api, type Json } from '@/services/api';
+import { getFeedbackMap, unratedCompleted } from '@/services/jobFeedback';
+import { useUserSession, userSession } from '@/services/session';
+import { colors, fonts, text } from '@/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ApiException, api, type Json } from '@/services/api';
-import { appointmentStatusColor, formatDateTime, iconForService } from '@/lib/format';
-import { RatingSheet } from '@/components/Rating';
-import { getFeedbackMap, unratedCompleted } from '@/services/jobFeedback';
-import { useUserSession, userSession } from '@/services/session';
-import { colors, fonts, text } from '@/theme/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -62,7 +62,7 @@ export default function HomeScreen() {
     { icon: 'book-outline', label: 'Book Now', color: colors.primary, onPress: () => goTab('booking') },
     { icon: 'calendar-outline', label: 'Appointments', color: colors.blue, onPress: () => router.push('/appointments') },
     { icon: 'chatbubble-outline', label: 'Live Chat', color: colors.green, onPress: () => goTab('chat') },
-    { icon: 'construct-outline', label: 'Parts', color: '#00897B', onPress: () => goTab('parts') },
+    { icon: 'construct-outline', label: 'Shop', color: '#00897B', onPress: () => goTab('parts') },
     { icon: 'chatbox-ellipses-outline', label: 'Inquiries', color: '#6A5ACD', onPress: () => router.push('/my-inquiries') },
     { icon: 'bag-outline', label: 'My Orders', color: '#D97706', onPress: () => router.push('/my-orders') },
     { icon: 'car-outline', label: 'My Vehicles', color: '#3B7DDB', onPress: () => router.push('/my-vehicles') },

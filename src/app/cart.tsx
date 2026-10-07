@@ -1,10 +1,21 @@
 // Port of lib/screens/customer/cart_screen.dart.
+import { AddressForm } from '@/components/AddressForm';
+import { useToast } from '@/components/Toast';
+import { PrimaryButton } from '@/components/ui';
+import { formatAddress, isAddressComplete } from '@/lib/address';
+import { confirm, showAlert } from '@/lib/dialogs';
+import { peso } from '@/lib/format';
+import { ACCOUNT_PROFILE_ID, useDeliveryProfiles, type DeliveryProfile, type ProfileInput } from '@/services/addressBook';
+import { ApiException, api } from '@/services/api';
+import { cart, useCart } from '@/services/cart';
+import { paymentPreference } from '@/services/paymentPreference';
+import { qrphHandoff } from '@/services/qrphHandoff';
+import { colors, fonts, text } from '@/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -12,19 +23,8 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  View,
+  View
 } from 'react-native';
-import { PrimaryButton } from '@/components/ui';
-import { useToast } from '@/components/Toast';
-import { confirm, showAlert } from '@/lib/dialogs';
-import { peso } from '@/lib/format';
-import { ApiException, api } from '@/services/api';
-import { cart, useCart } from '@/services/cart';
-import { paymentPreference } from '@/services/paymentPreference';
-import { qrphHandoff } from '@/services/qrphHandoff';
-import { userSession } from '@/services/session';
-import { colors, fonts, text } from '@/theme/theme';
 
 type PaymentMethod = 'online' | 'cod';
 type OnlineSub = 'card' | 'qrph';
@@ -34,18 +34,17 @@ export default function CartScreen() {
   const toast = useToast();
   const { items, totalPrice, isEmpty } = useCart();
 
-  const user = userSession.user;
-  const savedAddress = String(user?.address ?? '').trim();
-  const [name, setName] = useState(String(user?.full_name ?? user?.name ?? ''));
-  const [contact, setContact] = useState(String(user?.phone ?? ''));
-  const [address, setAddress] = useState(savedAddress);
-  const [errors, setErrors] = useState<{ name?: string; contact?: string; address?: string }>({});
+  const { profiles, add, update, remove } = useDeliveryProfiles();
+  const [selectedId, setSelectedId] = useState<string>(ACCOUNT_PROFILE_ID);
+  // null = form closed, 'new' = adding another profile, otherwise the id being edited
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [method, setMethod] = useState<PaymentMethod>('online');
   const [sub, setSub] = useState<OnlineSub>('qrph');
   const [placing, setPlacing] = useState(false);
   const scroller = useRef<ScrollView>(null);
 
-  const addressMatchesSaved = savedAddress.length > 0 && address.trim() === savedAddress;
+  const selected = profiles.find((p) => p.id === selectedId) ?? profiles[0];
 
   useEffect(() => {
     cart.load();
@@ -55,12 +54,26 @@ export default function CartScreen() {
     });
   }, []);
 
-  function applyProfileAddress() {
-    if (!savedAddress) {
-      showAlert('No Saved Address', 'You do not have an address saved in your profile yet.');
-      return;
+  function saveProfile(input: ProfileInput) {
+    if (editingId === 'new') {
+      const created = add(input);
+      setSelectedId(created.id);
+      toast('Profile added.', 'success');
+    } else if (editingId) {
+      update(editingId, input);
+      setSelectedId(editingId);
+      toast('Profile updated.', 'success');
     }
-    setAddress(savedAddress);
+    setProfileError(null);
+    setEditingId(null);
+  }
+
+  async function deleteProfile(p: DeliveryProfile) {
+    if (await confirm('Delete profile?', `Remove "${p.label}" from your saved delivery profiles?`, { confirmText: 'Delete', destructive: true })) {
+      remove(p.id);
+      if (selectedId === p.id) setSelectedId(ACCOUNT_PROFILE_ID);
+      if (editingId === p.id) setEditingId(null);
+    }
   }
 
   async function clearCart() {
@@ -70,12 +83,21 @@ export default function CartScreen() {
   }
 
   function validate() {
-    const e: typeof errors = {};
-    if (name.trim().length < 2) e.name = 'Enter your name';
-    if (contact.trim().length < 7) e.contact = 'Enter a valid contact number';
-    if (!address.trim()) e.address = 'Enter your address';
-    setErrors(e);
-    return !e.name && !e.contact && !e.address;
+    if (editingId) {
+      setProfileError('Save or cancel the profile you are editing first.');
+      return false;
+    }
+    const ok =
+      !!selected &&
+      selected.name.trim().length >= 2 &&
+      selected.contact.trim().length >= 7 &&
+      isAddressComplete(selected.address);
+    if (!ok) {
+      setProfileError('This profile is missing details. Tap Edit to complete the name, contact number and address.');
+      return false;
+    }
+    setProfileError(null);
+    return true;
   }
 
   async function placeOrder() {
@@ -91,9 +113,9 @@ export default function CartScreen() {
     setPlacing(true);
     try {
       const res = await api.placeOrder({
-        customerName: name.trim(),
-        contact: contact.trim(),
-        address: address.trim(),
+        customerName: selected.name.trim(),
+        contact: selected.contact.trim(),
+        address: formatAddress(selected.address),
         items: cart.toOrderItems(),
         totalPrice: cart.totalPrice,
         paymentMethod: method,
@@ -125,9 +147,9 @@ export default function CartScreen() {
     const total = cart.totalPrice;
     try {
       const res = await api.createQrphPayment({
-        customerName: name.trim(),
-        contact: contact.trim(),
-        address: address.trim(),
+        customerName: selected.name.trim(),
+        contact: selected.contact.trim(),
+        address: formatAddress(selected.address),
         items: cart.toOrderItems(),
         totalPrice: total,
       });
@@ -234,36 +256,47 @@ export default function CartScreen() {
         </View>
 
         <Text style={[text.headingSmall, { marginTop: 24, marginBottom: 12 }]}>Place Order</Text>
-        <CartField placeholder="Your Name" value={name} onChangeText={setName} error={errors.name} />
-        <CartField placeholder="Contact Number" value={contact} onChangeText={setContact} keyboardType="phone-pad" error={errors.contact} />
-
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, marginBottom: 8 }}>
-          <Text style={styles.sectionLabel}>DELIVERY / PICKUP ADDRESS</Text>
-          <Pressable onPress={applyProfileAddress} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Ionicons name="location" size={16} color={colors.primary} />
-            <Text style={{ color: colors.primary, fontFamily: fonts.semibold, fontSize: 12 }}>Use Profile Address</Text>
-          </Pressable>
-        </View>
-        <CartField
-          placeholder="Enter your complete address"
-          value={address}
-          onChangeText={setAddress}
-          error={errors.address}
-          multiline
-          style={{ minHeight: 70, textAlignVertical: 'top' }}
-          testID="cart_address_field"
-        />
-        {addressMatchesSaved ? (
-          <View style={styles.noteRow}>
-            <Ionicons name="checkmark-circle" size={14} color={colors.green} />
-            <Text style={[text.bodySmall, { color: colors.green }]}>Your saved profile address has been loaded.</Text>
-          </View>
-        ) : (
-          <View style={styles.noteRow}>
-            <Ionicons name="information-circle-outline" size={14} color={colors.grey} />
-            <Text style={[text.bodySmall, { flex: 1 }]}>You can use your saved profile address or enter a different address for this order.</Text>
-          </View>
+        <Text style={[styles.sectionLabel, { marginBottom: 8 }]}>DELIVER TO</Text>
+        {profiles.map((p) =>
+          editingId === p.id ? (
+            <AddressForm
+              key={p.id}
+              title={p.isAccount ? 'Edit My Profile Address' : `Edit ${p.label}`}
+              showLabel={!p.isAccount}
+              initial={p}
+              submitText="Save & Use"
+              onSubmit={saveProfile}
+              onCancel={() => setEditingId(null)}
+            />
+          ) : (
+            <ProfileCard
+              key={p.id}
+              profile={p}
+              selected={selected?.id === p.id}
+              onSelect={() => {
+                setSelectedId(p.id);
+                setProfileError(null);
+              }}
+              onEdit={() => setEditingId(p.id)}
+              onDelete={p.isAccount ? undefined : () => deleteProfile(p)}
+            />
+          ),
         )}
+        {editingId === 'new' ? (
+          <AddressForm
+            title="Add Another Profile & Address"
+            showLabel
+            submitText="Save & Use"
+            onSubmit={saveProfile}
+            onCancel={() => setEditingId(null)}
+          />
+        ) : (
+          <Pressable onPress={() => setEditingId('new')} style={styles.addBtn} accessibilityRole="button">
+            <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
+            <Text style={{ color: colors.primary, fontFamily: fonts.semibold, fontSize: 14 }}>Add another profile / shipping address</Text>
+          </Pressable>
+        )}
+        {profileError ? <Text style={[text.error, { marginTop: 8 }]}>{profileError}</Text> : null}
 
         <Text style={[styles.sectionLabel, { marginTop: 24, marginBottom: 8 }]}>PAYMENT METHOD</Text>
         <MethodCard
@@ -310,23 +343,51 @@ function QtyButton({ icon, onPress, disabled }: { icon: 'add' | 'remove'; onPres
   );
 }
 
-function CartField({ error, style, ...rest }: React.ComponentProps<typeof TextInput> & { error?: string }) {
-  const [focused, setFocused] = useState(false);
+function ProfileCard({
+  profile,
+  selected,
+  onSelect,
+  onEdit,
+  onDelete,
+}: {
+  profile: DeliveryProfile;
+  selected: boolean;
+  onSelect: () => void;
+  onEdit: () => void;
+  onDelete?: () => void;
+}) {
+  const complete =
+    profile.name.trim().length >= 2 && profile.contact.trim().length >= 7 && isAddressComplete(profile.address);
   return (
-    <View style={{ marginBottom: 12 }}>
-      <TextInput
-        {...rest}
-        placeholderTextColor={colors.grey}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        style={[
-          styles.input,
-          { borderColor: focused ? colors.primary : colors.greyBorder, borderWidth: focused ? 1.5 : 1 },
-          style,
-        ]}
-      />
-      {error ? <Text style={[text.error, { marginTop: 4 }]}>{error}</Text> : null}
-    </View>
+    <Pressable
+      onPress={onSelect}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      style={[styles.method, { alignItems: 'flex-start' }, selected && { borderColor: colors.primary, backgroundColor: colors.primaryLight }]}
+    >
+      <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={22} color={selected ? colors.primary : colors.grey} style={{ marginTop: 2 }} />
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <Text style={{ fontFamily: fonts.semibold, fontSize: 14 }}>{profile.label}</Text>
+        {profile.name || profile.contact ? (
+          <Text style={[text.bodyMedium, { fontSize: 13 }]}>{[profile.name, profile.contact].filter(Boolean).join(' · ')}</Text>
+        ) : null}
+        {complete ? (
+          <Text style={[text.bodySmall, { color: colors.greyText, marginTop: 2 }]}>{formatAddress(profile.address)}</Text>
+        ) : (
+          <Text style={[text.error, { marginTop: 2 }]}>Incomplete details — tap Edit to finish this profile.</Text>
+        )}
+      </View>
+      <View style={{ alignItems: 'flex-end', gap: 10 }}>
+        <Pressable onPress={onEdit} hitSlop={8} accessibilityLabel={`Edit ${profile.label}`}>
+          <Ionicons name="create-outline" size={20} color={colors.primary} />
+        </Pressable>
+        {onDelete ? (
+          <Pressable onPress={onDelete} hitSlop={8} accessibilityLabel={`Delete ${profile.label}`}>
+            <Ionicons name="trash-outline" size={20} color={colors.red} />
+          </Pressable>
+        ) : null}
+      </View>
+    </Pressable>
   );
 }
 
@@ -374,8 +435,7 @@ const styles = StyleSheet.create({
   qtyBtn: { width: 26, height: 26, borderRadius: 8, borderWidth: 1, borderColor: colors.greyBorder, alignItems: 'center', justifyContent: 'center' },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 16, marginTop: 6, borderTopWidth: 1, borderTopColor: colors.greyBorder },
   sectionLabel: { fontFamily: fonts.semibold, fontSize: 12, letterSpacing: 0.6, color: colors.greyText },
-  input: { borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, fontSize: 14, fontFamily: fonts.regular, color: colors.black },
-  noteRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.primary },
   method: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 14, borderWidth: 1.5, borderColor: colors.greyBorder, marginBottom: 8 },
   subChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, borderWidth: 1.5, borderColor: colors.greyBorder },
 });
