@@ -5,6 +5,7 @@
 import { RatingSheet } from '@/components/Rating';
 import { api, type Json } from '@/services/api';
 import { getFeedbackMap, unratedCompleted } from '@/services/jobFeedback';
+import { refreshPoints } from '@/services/session';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
@@ -21,6 +22,9 @@ export function FeedbackGate() {
       const res = await api.getQuiet('get_appointments.php');
       const feedback = await getFeedbackMap();
       setQueue(unratedCompleted((res.appointments as Json[]) ?? [], feedback));
+      // Points are awarded server-side (e.g. +50 when an appointment is marked
+      // Completed), so keep the balance fresh while the app is open.
+      await refreshPoints();
     } catch {
       // Offline / server hiccup: try again on the next tick. Never logs the user out.
     } finally {

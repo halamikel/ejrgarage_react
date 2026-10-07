@@ -5,6 +5,7 @@ import { PrimaryButton } from '@/components/ui';
 import { formatDateTime } from '@/lib/format';
 import type { Json } from '@/services/api';
 import { MAX_RATING, RATING_LABELS, getAllFeedback, submitJobFeedback, type JobFeedback, type RatingStats } from '@/services/jobFeedback';
+import { refreshPoints } from '@/services/session';
 import { colors, fonts, text } from '@/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
@@ -72,7 +73,13 @@ export function RatingSheet({ appointment, onSubmitted }: { appointment: Json | 
         mechanicName: appointment.mechanic_name ? String(appointment.mechanic_name) : undefined,
         serviceType: appointment.service_type ? String(appointment.service_type) : undefined,
       });
-      toast('Thank you for your feedback!', 'success');
+      // The server awards review points; re-read the balance and only mention
+      // points if it actually went up.
+      const gained = await refreshPoints();
+      toast(
+        gained && gained > 0 ? `Thank you for your feedback! +${gained} EJR points` : 'Thank you for your feedback!',
+        'success',
+      );
       onSubmitted(f);
     } catch (e) {
       // Toasts render behind the modal, so show the error inside the sheet.

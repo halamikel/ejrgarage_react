@@ -123,6 +123,23 @@ export function restoreSession(): Promise<void> {
   return restorePromise;
 }
 
+/**
+ * Quietly re-reads the profile (points are awarded server-side) and updates the
+ * session. Returns how many points the balance changed by, or null if the
+ * refresh failed. Never throws and never logs the user out.
+ */
+export async function refreshPoints(): Promise<number | null> {
+  try {
+    const before = userSession.points;
+    const res = await api.getQuiet('get_profile.php');
+    if (!res.user) return null;
+    userSession.setUser(res.user);
+    return userSession.points - before;
+  } catch {
+    return null;
+  }
+}
+
 /** Re-renders the component whenever the session user changes. */
 export function useUserSession() {
   const user = useSyncExternalStore(userSession.subscribe, userSession.getSnapshot);
