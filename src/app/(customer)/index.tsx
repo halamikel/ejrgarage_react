@@ -1,5 +1,6 @@
 // Port of _HomeContent in lib/screens/customer/home_screen.dart.
 import { RatingSheet } from '@/components/Rating';
+import { RescueButton } from '@/components/RescueButton';
 import { appointmentStatusColor, formatDateTime, iconForService } from '@/lib/format';
 import { ApiException, api, type Json } from '@/services/api';
 import { getFeedbackMap, unratedCompleted } from '@/services/jobFeedback';
@@ -90,6 +91,8 @@ export default function HomeScreen() {
           <Ionicons name="search" size={22} color={colors.grey} />
           <Text style={[text.bodyMedium, { color: colors.grey, marginLeft: 10 }]}>Search services...</Text>
         </Pressable>
+
+        <RescueButton />
 
         <Text style={[text.headingSmall, { marginTop: 28, marginBottom: 16 }]}>Quick Actions</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 22 }}>
