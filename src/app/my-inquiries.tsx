@@ -1,12 +1,12 @@
 // Port of lib/screens/customer/my_inquiries_screen.dart.
 // Backend: get_inquiries.php (the logged-in customer's part inquiries).
 // Inquiries are created from the Parts screen; the admin's reply appears here.
+import { useState } from 'react';
+import { Text, View } from 'react-native';
 import { Card, FilterChips, ListScreen, Meta, Pill, useAdminList } from '@/components/admin';
 import { formatDateTime } from '@/lib/format';
 import { api, type Json } from '@/services/api';
 import { colors, fonts, text } from '@/theme/theme';
-import { useState } from 'react';
-import { Text, View } from 'react-native';
 
 const isResponded = (i: Json) => String(i.status).toLowerCase() === 'responded';
 
@@ -22,7 +22,7 @@ export default function MyInquiriesScreen() {
       data={data}
       keyOf={(i) => String(i.id)}
       emptyIcon="chatbox-ellipses-outline"
-      emptyLabel={list.items.length === 0 ? 'No inquiries yet. Ask about a part from the Shop tab.' : 'No inquiries in this view.'}
+      emptyLabel={list.items.length === 0 ? 'No inquiries yet. Ask about a part from the Parts tab.' : 'No inquiries in this view.'}
       header={list.items.length > 0 ? <FilterChips options={['All', 'Pending', 'Replied']} value={filter} onChange={setFilter} /> : null}
       renderItem={(i) => {
         const done = isResponded(i);

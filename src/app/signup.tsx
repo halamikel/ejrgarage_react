@@ -13,7 +13,6 @@ export default function SignUpScreen() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [referralCode, setReferralCode] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,13 +21,7 @@ export default function SignUpScreen() {
     setLoading(true);
     setError(null);
     try {
-      await api.register({
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone.trim(),
-        password,
-        referral_code: referralCode.trim(),
-      });
+      await api.register({ name: name.trim(), email: email.trim(), phone: phone.trim(), password });
       // register.php doesn't log in; the user must click the emailed link first.
       await showAlert('Account created!', 'Check your email to verify before logging in.');
       router.replace('/login');
@@ -75,13 +68,6 @@ export default function SignUpScreen() {
         password
         autoCapitalize="none"
         autoComplete="new-password"
-      />
-      <Field
-        label="Referral Code (Optional)"
-        placeholder="Enter friend's ID"
-        value={referralCode}
-        onChangeText={setReferralCode}
-        autoCapitalize="none"
       />
 
       <CheckRow checked={agreeTerms} onToggle={() => setAgreeTerms((v) => !v)}>

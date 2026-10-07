@@ -1,16 +1,13 @@
 // Port of _HomeContent in lib/screens/customer/home_screen.dart.
-import { RatingSheet } from '@/components/Rating';
-import { RescueButton } from '@/components/RescueButton';
-import { appointmentStatusColor, formatDateTime, iconForService } from '@/lib/format';
-import { ApiException, api, type Json } from '@/services/api';
-import { getFeedbackMap, unratedCompleted } from '@/services/jobFeedback';
-import { useUserSession, userSession } from '@/services/session';
-import { colors, fonts, text } from '@/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ApiException, api, type Json } from '@/services/api';
+import { appointmentStatusColor, formatDateTime, iconForService } from '@/lib/format';
+import { useUserSession, userSession } from '@/services/session';
+import { colors, fonts, text } from '@/theme/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -21,7 +18,6 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [services, setServices] = useState<Json[]>([]);
   const [appointments, setAppointments] = useState<Json[]>([]);
-  const [unratedAppt, setUnratedAppt] = useState<Json | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -36,15 +32,7 @@ export default function HomeScreen() {
       ]);
       if (profileRes.user) userSession.setUser(profileRes.user);
       setServices(((servicesRes.services as Json[]) ?? []).slice(0, 3));
-      const appts = (appointmentsRes.appointments as Json[]) ?? [];
-      setAppointments(appts.slice(0, 2));
-
-      // Show rating prompt if there are unrated completed jobs
-      const feedback = await getFeedbackMap();
-      const unrated = unratedCompleted(appts, feedback);
-      if (unrated.length > 0) {
-        setUnratedAppt(unrated[0]);
-      }
+      setAppointments(((appointmentsRes.appointments as Json[]) ?? []).slice(0, 2));
     } catch (e) {
       setError(e instanceof ApiException ? e.message : 'Could not load your dashboard. Check your connection.');
     } finally {
@@ -63,7 +51,7 @@ export default function HomeScreen() {
     { icon: 'book-outline', label: 'Book Now', color: colors.primary, onPress: () => goTab('booking') },
     { icon: 'calendar-outline', label: 'Appointments', color: colors.blue, onPress: () => router.push('/appointments') },
     { icon: 'chatbubble-outline', label: 'Live Chat', color: colors.green, onPress: () => goTab('chat') },
-    { icon: 'construct-outline', label: 'Shop', color: '#00897B', onPress: () => goTab('parts') },
+    { icon: 'construct-outline', label: 'Parts', color: '#00897B', onPress: () => goTab('parts') },
     { icon: 'chatbox-ellipses-outline', label: 'Inquiries', color: '#6A5ACD', onPress: () => router.push('/my-inquiries') },
     { icon: 'bag-outline', label: 'My Orders', color: '#D97706', onPress: () => router.push('/my-orders') },
     { icon: 'car-outline', label: 'My Vehicles', color: '#3B7DDB', onPress: () => router.push('/my-vehicles') },
@@ -80,10 +68,9 @@ export default function HomeScreen() {
             <Text style={[text.headingMedium, { fontSize: 22 }]}>Hello, {firstName}! 👋</Text>
             <Text style={[text.bodyMedium, { color: colors.grey, marginTop: 4 }]}>Welcome to EJR Garage</Text>
           </View>
-          <Pressable style={styles.pointsBadge} onPress={() => router.push('/(customer)/profile')}>
-            <Ionicons name="star" size={16} color={colors.primary} />
-            <Text style={styles.pointsText}>{session.points} pts</Text>
-          </Pressable>
+          <View style={styles.bell}>
+            <Ionicons name="notifications-outline" size={22} color={colors.black} />
+          </View>
         </View>
 
         {/* Read-only search bar that jumps to the Booking tab, like Flutter's */}
@@ -91,8 +78,6 @@ export default function HomeScreen() {
           <Ionicons name="search" size={22} color={colors.grey} />
           <Text style={[text.bodyMedium, { color: colors.grey, marginLeft: 10 }]}>Search services...</Text>
         </Pressable>
-
-        <RescueButton />
 
         <Text style={[text.headingSmall, { marginTop: 28, marginBottom: 16 }]}>Quick Actions</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 22 }}>
@@ -167,14 +152,6 @@ export default function HomeScreen() {
           </View>
         )}
       </ScrollView>
-
-      <RatingSheet
-        appointment={unratedAppt}
-        onSubmitted={() => {
-          setUnratedAppt(null);
-          load();
-        }}
-      />
     </SafeAreaView>
   );
 }
@@ -220,20 +197,6 @@ const styles = StyleSheet.create({
   },
   cardIcon: { width: 50, height: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  pointsBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-  },
-  pointsText: {
-    fontFamily: fonts.bold,
-    fontSize: 14,
-    color: colors.primary,
-  },
   errorBox: {
     padding: 16,
     borderRadius: 12,
