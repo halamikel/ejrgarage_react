@@ -457,6 +457,9 @@ class ApiService {
   getMyVouchers() {
     return this.get('get_my_vouchers.php');
   }
+  getPointsHistory() {
+    return this.get('get_points_history.php');
+  }
   claimReward(rewardId: number) {
     return this.post('claim_reward.php', { reward_id: rewardId });
   }

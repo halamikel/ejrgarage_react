@@ -1,3 +1,8 @@
+import { ToastProvider } from '@/components/Toast';
+import { onUnauthorized } from '@/services/api';
+import { initNotifications, stopPolling } from '@/services/notifications';
+import { restoreSession, userSession } from '@/services/session';
+import { colors, fonts } from '@/theme/theme';
 import {
   Poppins_400Regular,
   Poppins_500Medium,
@@ -11,11 +16,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { onUnauthorized } from '@/services/api';
-import { initNotifications, stopPolling } from '@/services/notifications';
-import { restoreSession, userSession } from '@/services/session';
-import { ToastProvider } from '@/components/Toast';
-import { colors, fonts } from '@/theme/theme';
 
 // Shared AppBar look for screens pushed on top of the role areas (Flutter's
 // centered 18px/w600 AppBar title, no elevation).
@@ -79,6 +79,7 @@ export default function RootLayout() {
             <Stack.Screen name="terms" options={pushed('Terms & Conditions')} />
             <Stack.Screen name="cart" options={pushed('My Cart')} />
             <Stack.Screen name="my-orders" options={pushed('My Orders')} />
+            <Stack.Screen name="points-history" options={pushed('Points History')} />
             <Stack.Screen name="my-inquiries" options={pushed('My Inquiries')} />
             <Stack.Screen name="my-vehicles" options={pushed('My Vehicles')} />
             <Stack.Screen name="edit-profile" options={pushed('Edit Profile')} />

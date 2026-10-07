@@ -1,14 +1,14 @@
-import { Ionicons } from '@expo/vector-icons';
-import * as Clipboard from 'expo-clipboard';
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useToast } from '@/components/Toast';
 import { confirm } from '@/lib/dialogs';
 import { ApiException, api, type Json } from '@/services/api';
 import { useUserSession, userSession } from '@/services/session';
 import { colors, fonts, text } from '@/theme/theme';
+import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function RewardsScreen() {
   const toast = useToast();
@@ -109,6 +109,10 @@ export default function RewardsScreen() {
             <Text style={styles.pointsValue}>{session.points} pts</Text>
           </View>
           <Text style={styles.pointsSubtext}>Earn 1 EJR point for every ₱200 spent</Text>
+          <Pressable onPress={() => router.push('/points-history')} style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={{ color: colors.white, fontFamily: fonts.bold, fontSize: 13 }}>View points history</Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.white} />
+          </Pressable>
         </View>
 
         <View style={styles.tabs}>
