@@ -52,15 +52,18 @@ export function RatingSheet({ appointment, onSubmitted }: { appointment: Json | 
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     setRating(0);
     setComment('');
+    setError('');
   }, [appointment?.id]);
 
   async function submit() {
     if (!appointment || rating < 1 || saving) return;
     setSaving(true);
+    setError('');
     try {
       const f = await submitJobFeedback({
         appointmentId: appointment.id,
@@ -72,7 +75,8 @@ export function RatingSheet({ appointment, onSubmitted }: { appointment: Json | 
       toast('Thank you for your feedback!', 'success');
       onSubmitted(f);
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not save your feedback. Please try again.', 'error');
+      // Toasts render behind the modal, so show the error inside the sheet.
+      setError(e instanceof Error ? e.message : 'Could not save your feedback. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -105,6 +109,7 @@ export function RatingSheet({ appointment, onSubmitted }: { appointment: Json | 
             maxLength={500}
             style={{ minHeight: 80, borderWidth: 1, borderColor: colors.greyBorder, borderRadius: 12, padding: 12, fontFamily: fonts.regular, fontSize: 14, color: colors.black, textAlignVertical: 'top' }}
           />
+          {error ? <Text style={{ marginTop: 10, fontFamily: fonts.regular, fontSize: 13, color: colors.red }}>{error}</Text> : null}
           <PrimaryButton title="Submit Feedback" onPress={submit} loading={saving} disabled={rating < 1} style={{ marginTop: 16 }} />
         </>
       )}

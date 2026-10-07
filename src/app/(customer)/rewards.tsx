@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useToast } from '@/components/Toast';
@@ -22,26 +23,33 @@ export default function RewardsScreen() {
   const load = useCallback(async (pull = false) => {
     if (pull) setRefreshing(true);
     else setLoading(true);
+    // Load each piece independently: a failure in the rewards/vouchers endpoints
+    // must not stop the points balance (from get_profile.php) from refreshing.
+    const [res, profileRes, vouchersRes] = await Promise.allSettled([
+      api.getRewards(),
+      api.getProfile(),
+      api.getMyVouchers(),
+    ]);
     try {
-      const [res, profileRes, vouchersRes] = await Promise.all([
-        api.getRewards(),
-        api.getProfile(),
-        api.getMyVouchers(),
-      ]);
-      setRewards((res.rewards as Json[]) ?? []);
-      setVouchers((vouchersRes.vouchers as Json[]) ?? []);
-      if (profileRes.user) userSession.setUser(profileRes.user);
-    } catch (e) {
-      console.error(e);
+      if (profileRes.status === 'fulfilled' && profileRes.value.user) userSession.setUser(profileRes.value.user);
+      if (res.status === 'fulfilled') setRewards((res.value.rewards as Json[]) ?? []);
+      if (vouchersRes.status === 'fulfilled') setVouchers((vouchersRes.value.vouchers as Json[]) ?? []);
+      const failed = [res, profileRes, vouchersRes].find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+      if (failed) {
+        console.error(failed.reason);
+        toast(failed.reason instanceof Error ? failed.reason.message : 'Could not load rewards.', 'error');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [toast]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
 
   async function copyToClipboard(code: string) {
     await Clipboard.setStringAsync(code);

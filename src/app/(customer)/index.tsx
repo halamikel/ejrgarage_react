@@ -1,6 +1,6 @@
 // Port of _HomeContent in lib/screens/customer/home_screen.dart.
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -43,6 +43,14 @@ export default function HomeScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Points are awarded server-side (e.g. when an appointment is completed), so
+  // re-read the profile whenever Home regains focus to show the latest balance.
+  useFocusEffect(
+    useCallback(() => {
+      api.getProfile().then((r) => r.user && userSession.setUser(r.user)).catch(() => {});
+    }, []),
+  );
 
   const goTab = (name: 'parts' | 'booking' | 'chat') => router.navigate(`/(customer)/${name}`);
   const firstName = session.displayName.split(' ')[0];

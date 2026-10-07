@@ -62,13 +62,6 @@ export async function submitJobFeedback(input: {
   const all = await readAll();
   if (all.some((f) => Number(f.appointmentId) === id)) return all.find((f) => Number(f.appointmentId) === id)!;
 
-  // Sync to backend
-  await api.submitFeedback({
-    appointment_id: id,
-    rating,
-    comment: (input.comment ?? '').trim(),
-  });
-
   const feedback: JobFeedback = {
     appointmentId: String(id),
     rating,
@@ -77,7 +70,16 @@ export async function submitJobFeedback(input: {
     serviceType: input.serviceType,
     createdAt: new Date().toISOString(),
   };
+  // Save on-device first so the rating always sticks and the sheet closes,
+  // even if the backend endpoint is missing or the server is asleep/offline.
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([...all, feedback]));
+
+  // Best-effort sync to backend; a failure here must not block the customer.
+  try {
+    await api.submitFeedback({ appointment_id: id, rating, comment: feedback.comment });
+  } catch (e) {
+    console.warn('[feedback] backend sync failed (saved locally):', e);
+  }
   return feedback;
 }
 
