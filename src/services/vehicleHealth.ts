@@ -69,6 +69,7 @@ function recommendationsFor(results: InspectionResult) {
   });
 }
 
+// Read for display: unreadable data just shows as empty.
 async function readAll(): Promise<VehicleHealthInspection[]> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
@@ -77,6 +78,24 @@ async function readAll(): Promise<VehicleHealthInspection[]> {
   } catch {
     return [];
   }
+}
+
+// Read for writing: throws instead of returning [] when storage is unreadable, so a
+// failed/corrupt read can never lead to wiping every saved inspection.
+async function readForWrite(): Promise<VehicleHealthInspection[]> {
+  const raw = await AsyncStorage.getItem(STORAGE_KEY);
+  if (!raw) return [];
+  const parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed)) throw new Error('Saved inspection data is corrupted.');
+  return parsed;
+}
+
+// Serialize writes so two quick saves can't read the same list and drop one.
+let writeQueue: Promise<unknown> = Promise.resolve();
+function enqueue<T>(task: () => Promise<T>): Promise<T> {
+  const run = writeQueue.then(task, task);
+  writeQueue = run.catch(() => {});
+  return run;
 }
 
 export async function getVehicleHealthHistory(vehicleKey: string) {
@@ -92,7 +111,6 @@ export async function saveVehicleInspection(input: {
   results: InspectionResult;
   notes: Partial<Record<InspectionComponent, string>>;
 }) {
-  const all = await readAll();
   const inspection: VehicleHealthInspection = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     vehicleKey: vehicleHealthKey(input.vehicle),
@@ -105,6 +123,9 @@ export async function saveVehicleInspection(input: {
     score: scoreForResults(input.results),
     recommendations: recommendationsFor(input.results),
   };
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([...all, inspection]));
+  await enqueue(async () => {
+    const all = await readForWrite();
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([...all, inspection]));
+  });
   return inspection;
 }

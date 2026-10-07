@@ -20,8 +20,17 @@ export const secureStorage = {
     return isWeb ? (ls()?.getItem(key) ?? null) : SecureStore.getItemAsync(key);
   },
   async setItem(key: string, value: string): Promise<void> {
-    if (isWeb) ls()?.setItem(key, value);
-    else await SecureStore.setItemAsync(key, value);
+    if (isWeb) {
+      const store = ls();
+      if (!store) throw new Error('Browser storage is unavailable (private mode or blocked).');
+      try {
+        store.setItem(key, value);
+      } catch (e) {
+        throw new Error(`Could not save to browser storage: ${e instanceof Error ? e.message : e}`);
+      }
+    } else {
+      await SecureStore.setItemAsync(key, value);
+    }
   },
   async deleteItem(key: string): Promise<void> {
     if (isWeb) ls()?.removeItem(key);

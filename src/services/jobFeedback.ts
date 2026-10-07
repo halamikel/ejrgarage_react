@@ -38,6 +38,21 @@ async function readAll(): Promise<JobFeedback[]> {
   }
 }
 
+async function readForWrite(): Promise<JobFeedback[]> {
+  const raw = await AsyncStorage.getItem(STORAGE_KEY);
+  if (!raw) return [];
+  const parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed)) throw new Error('Saved feedback data is corrupted.');
+  return parsed;
+}
+
+let writeQueue: Promise<unknown> = Promise.resolve();
+function enqueue<T>(task: () => Promise<T>): Promise<T> {
+  const run = writeQueue.then(task, task);
+  writeQueue = run.catch(() => {});
+  return run;
+}
+
 export async function getAllFeedback() {
   return readAll();
 }
@@ -59,9 +74,6 @@ export async function submitJobFeedback(input: {
     throw new Error('Please choose a rating from 1 to 5 stars.');
   }
   const id = Number(input.appointmentId);
-  const all = await readAll();
-  if (all.some((f) => Number(f.appointmentId) === id)) return all.find((f) => Number(f.appointmentId) === id)!;
-
   const feedback: JobFeedback = {
     appointmentId: String(id),
     rating,
@@ -72,7 +84,14 @@ export async function submitJobFeedback(input: {
   };
   // Save on-device first so the rating always sticks and the sheet closes,
   // even if the backend endpoint is missing or the server is asleep/offline.
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([...all, feedback]));
+  const existing = await enqueue(async () => {
+    const all = await readForWrite();
+    const dup = all.find((f) => Number(f.appointmentId) === id);
+    if (dup) return dup;
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([...all, feedback]));
+    return null;
+  });
+  if (existing) return existing;
 
   // Best-effort sync to backend; a failure here must not block the customer.
   try {

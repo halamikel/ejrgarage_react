@@ -31,6 +31,7 @@ class CartService {
   private _items: readonly CartItem[] = [];
   private listeners = new Set<() => void>();
   private loaded = false;
+  private dirty = false; // true once the user changed the cart (so a late load() can't overwrite it)
 
   subscribe = (l: () => void) => {
     this.listeners.add(l);
@@ -55,8 +56,11 @@ class CartService {
 
   private commit(items: CartItem[]) {
     this._items = items;
+    this.dirty = true;
     this.listeners.forEach((l) => l());
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(items)).catch(() => {});
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(items)).catch((e) =>
+      console.warn('[cart] failed to persist cart:', e),
+    );
   }
 
   async load() {
@@ -64,7 +68,7 @@ class CartService {
     this.loaded = true;
     try {
       const raw = await AsyncStorage.getItem(STORAGE_KEY);
-      if (raw) {
+      if (raw && !this.dirty) {
         this._items = (JSON.parse(raw) as Record<string, any>[]).map(fromJson);
         this.listeners.forEach((l) => l());
       }

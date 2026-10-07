@@ -57,7 +57,9 @@ class AddressBook {
 
   private persist() {
     if (!this.userKey) return;
-    AsyncStorage.setItem(KEY_PREFIX + this.userKey, JSON.stringify(this.state)).catch(() => {});
+    AsyncStorage.setItem(KEY_PREFIX + this.userKey, JSON.stringify(this.state)).catch((e) =>
+      console.warn('[addressBook] failed to persist:', e),
+    );
   }
 
   /** Loads the book for this user (switching accounts swaps the data). */
