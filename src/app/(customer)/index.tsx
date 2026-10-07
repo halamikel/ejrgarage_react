@@ -79,6 +79,18 @@ export default function HomeScreen() {
           <Text style={[text.bodyMedium, { color: colors.grey, marginLeft: 10 }]}>Search services...</Text>
         </Pressable>
 
+        {/* EJR Points Card */}
+        <Pressable style={styles.rewardsCard} onPress={() => router.push('/(customer)/rewards')}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rewardsTitle}>EJR Points</Text>
+            <Text style={styles.rewardsSub}>You have <Text style={{ fontFamily: fonts.bold, color: colors.white }}>{session.points} pts</Text></Text>
+            <Text style={[styles.rewardsSub, { fontSize: 11, opacity: 0.9, marginTop: 8 }]}>Tap to view benefits & redeem vouchers</Text>
+          </View>
+          <View style={styles.rewardsIconBg}>
+            <Ionicons name="gift" size={32} color={colors.primary} />
+          </View>
+        </Pressable>
+
         <Text style={[text.headingSmall, { marginTop: 28, marginBottom: 16 }]}>Quick Actions</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 22 }}>
           {quickActions.map((a) => (
@@ -197,6 +209,39 @@ const styles = StyleSheet.create({
   },
   cardIcon: { width: 50, height: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  rewardsCard: {
+    marginTop: 24,
+    backgroundColor: colors.primary,
+    borderRadius: 20,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  rewardsTitle: {
+    color: colors.white,
+    fontFamily: fonts.bold,
+    fontSize: 18,
+  },
+  rewardsSub: {
+    color: 'rgba(255,255,255,0.8)',
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    marginTop: 4,
+  },
+  rewardsIconBg: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 16,
+  },
   errorBox: {
     padding: 16,
     borderRadius: 12,

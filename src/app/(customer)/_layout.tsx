@@ -5,9 +5,9 @@ import { useRoleGuard } from '@/lib/RoleGuard';
 import { cart } from '@/services/cart';
 import { colors, fonts } from '@/theme/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { router, Tabs } from 'expo-router';
 import { useEffect } from 'react';
-import type { ColorValue } from 'react-native';
+import { Pressable, type ColorValue } from 'react-native';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 const icon = (on: IconName, off: IconName) =>
@@ -43,6 +43,22 @@ export default function CustomerLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: icon('home', 'home-outline') }} />
+      <Tabs.Screen
+        name="rewards"
+        options={{
+          href: null,
+          headerShown: true,
+          headerTitle: 'EJR Points',
+          headerTitleAlign: 'center',
+          headerShadowVisible: false,
+          headerTitleStyle: { fontFamily: fonts.semibold, fontSize: 18 },
+          headerLeft: () => (
+            <Pressable onPress={() => router.back()} style={{ marginLeft: 16 }}>
+              <Ionicons name="arrow-back" size={24} color={colors.black} />
+            </Pressable>
+          ),
+        }}
+      />
       <Tabs.Screen
         name="parts"
         options={{

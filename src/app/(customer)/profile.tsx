@@ -13,7 +13,8 @@ import { colors, fonts, text } from '@/theme/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-const MENU: { icon: IconName; label: string; href: '/my-orders' | '/appointments' | '/my-vehicles' | '/my-inquiries' | '/edit-profile' | '/settings' | '/terms' }[] = [
+const MENU: { icon: IconName; label: string; href: string }[] = [
+  { icon: 'star-outline', label: 'My EJR Points', href: '/(customer)/rewards' },
   { icon: 'bag-outline', label: 'My Orders', href: '/my-orders' },
   { icon: 'calendar-outline', label: 'Appointments', href: '/appointments' },
   { icon: 'car-outline', label: 'My Vehicles', href: '/my-vehicles' },

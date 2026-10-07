@@ -337,7 +337,6 @@ class ApiService {
     email: string;
     phone: string;
     password: string;
-    referral_code?: string;
   }): Promise<void> {
     const { res, body } = await this.publicPost('register.php', args);
     if (body.status !== 'success') {
@@ -451,6 +450,15 @@ class ApiService {
   }
   getMyInquiries() {
     return this.get('get_inquiries.php');
+  }
+  getRewards() {
+    return this.get('get_rewards.php');
+  }
+  getMyVouchers() {
+    return this.get('get_my_vouchers.php');
+  }
+  claimReward(rewardId: number) {
+    return this.post('claim_reward.php', { reward_id: rewardId });
   }
 
   // ── Vehicles & bookings (customer) ──────────────────────────
